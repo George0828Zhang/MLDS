@@ -1,18 +1,17 @@
 import tensorflow as tf
 from tensorflow.keras.models import Model #,Sequential
 from tensorflow.keras.layers import Input, Dense
-from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.optimizers import SGD, Adadelta
 
 import numpy as np
 import math
 import random
 import matplotlib.pyplot as plt
 
-epoch = 500
-data_size = 25000
-batch_size = 256
+epoch = 5000
+data_size = 10000
+batch_size = 128
 domain = (0, 1)
-test_size = 2000
 
 def target(x):
 	assert( x >= 0 )
@@ -37,7 +36,7 @@ if __name__ == "__main__":
 	inputs = Input(shape=(1,))
 
 	# a layer instance is callable on a tensor, and returns a tensor
-	
+
 	x = Dense(5, activation='relu')(inputs)
 	x = Dense(10, activation='relu')(x)
 	x = Dense(10, activation='relu')(x)
@@ -53,7 +52,26 @@ if __name__ == "__main__":
 	history = model.fit(x=np.asarray(data),y=np.asarray(labels), epochs=epoch,batch_size=batch_size)#validation_split=0.20
 
 	plt.plot(range(epoch), history.history['loss'])
-	model.save("deepModel.h5")
+	model.save("Model0.h5")
+
+
+
+
+	x = Dense(10, activation='relu')(inputs)
+	x = Dense(18, activation='relu')(x)
+	x = Dense(15, activation='relu')(x)
+	x = Dense(14, activation='relu')(x)
+	predictions = Dense(1, activation='linear')(x)
+
+	model = Model(inputs=inputs, outputs=predictions)
+	optimizer = SGD(lr=0.01, momentum=0.9, decay=1e-8, nesterov=False)
+	model.compile(loss='mean_squared_error',optimizer=optimizer)
+	history = model.fit(x=np.asarray(data),y=np.asarray(labels), epochs=epoch,batch_size=batch_size)#validation_split=0.20
+
+	plt.plot(range(epoch), history.history['loss'])
+	model.save("Model1.h5")
+
+
 
 
 
@@ -62,17 +80,18 @@ if __name__ == "__main__":
 	x = Dense(190, activation='relu')(inputs)
 	predictions = Dense(1, activation='linear')(x)
 	model = Model(inputs=inputs, outputs=predictions)
+	optimizer = Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0)
 	model.compile(loss='mean_squared_error',optimizer=optimizer)
 	history = model.fit(x=np.asarray(data),y=np.asarray(labels), epochs=epoch,batch_size=batch_size)
 
 	plt.plot(range(epoch), history.history['loss'])
-	model.save("shallowModel.h5")
+	model.save("Model2.h5")
 
 
 	plt.title('Model loss')
 	plt.ylabel('Loss')
 	plt.xlabel('Epoch')
-	plt.legend(['deep', 'shallow'], loc='upper right')
+	plt.legend(['Model0','Model1','Model2'], loc='upper right')
 	plt.show()
 
 

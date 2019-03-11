@@ -16,8 +16,9 @@ if __name__ == "__main__":
 	x = []
 	ground = []
 
-	model = load_model("deepModel.h5")
-	model2 = load_model("shallowModel.h5")
+	model0 = load_model("Model0.h5")
+	model1 = load_model("Model1.h5")
+	model2 = load_model("Model2.h5")
 
 	# from tensorflow.keras.utils import plot_model
 	# plot_model(model, show_shapes=True, to_file='model.png')
@@ -25,21 +26,21 @@ if __name__ == "__main__":
 	for i in range(sample):
 		x.append(i/sample)
 		ground.append(target(i/sample))
+	model1_predict = model1.predict(np.asarray(x))
+	model0_predict = model0.predict(np.asarray(x))
+	model1_predict = model1.predict(np.asarray(x))
+	model2_predict = model2.predict(np.asarray(x))
 
-	deep = model.predict(np.asarray(x))
-	shallow = model2.predict(np.asarray(x))
 
-
-	plt.plot(x, deep)
-	plt.plot(x, shallow)
+	plt.plot(x, model0_predict)
+	plt.plot(x, model1_predict)
+	plt.plot(x, model2_predict)
 	plt.plot(x, ground)
 	
 
 
-	plt.title('Model loss')
-	plt.ylabel('Loss')
-	plt.xlabel('Epoch')
-	plt.legend(['deep', 'shallow', 'ground truth'], loc='upper left')
+	plt.title('Function')
+	plt.legend(['model0', 'model1','model2','ground truth'], loc='upper left')
 	plt.show()
 
 

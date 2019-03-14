@@ -118,18 +118,18 @@ if __name__ =='__main__':
     collect_interval = 3
     weights = list()
     grads = list()
-    
+    loss = list()    
     
     for cnt in range(epochs):
         history = model.fit(x_train, y_train, batch_size=batch, verbose = 0)
         print("epoch:%d ,loss:%s"%(cnt, history.history['loss']))
         
         grads.append (get_gradients_norm(model, x_train, y_train) )
+        loss.append(history.history['loss'])
         
         if(cnt%collect_interval == 0):
             w = compressed_weights(model)
             weights.append(w)
-            
     
             
     pca = PCA(n_components=2)
@@ -146,8 +146,9 @@ if __name__ =='__main__':
     if not os.path.exists(base_dir):
         os.mkdir(base_dir)
     
-    np.save("./PCA_deisgned/model2_x_{}".format(sys.argv[1]), x)
-    np.save("./PCA_deisgned/model2_y_{}".format(sys.argv[1]), y)
+    np.save("./PCA_designed/model2_x_{}".format(sys.argv[1]), x)
+    np.save("./PCA_designed/model2_y_{}".format(sys.argv[1]), y)
+    np.save("./PCA_designed/model2_loss_{}".format(sys.argv[1]), loss)
         
         
         

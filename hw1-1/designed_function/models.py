@@ -84,8 +84,10 @@ if __name__ == "__main__":
 	model.save("model2.h5")
 	
     ###########################################################################
+    '''
 	plt.title('Model loss')
 	plt.ylabel('Loss')
 	plt.xlabel('Epoch')
 	plt.legend(['Model0','Model1','Model2'], loc='upper right')
 	plt.show()
+	'''

@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 #Config
-epochs = 250
+epochs = 10
 batch = 128
 data_size = 10000
 
@@ -43,7 +43,7 @@ def createModel():
     model.add(Dense(4,  activation='relu'))
     model.add(Dense(1,  activation='linear'))    
     
-    optimizer = SGD(lr=0.01, momentum=0.9, decay=1e-8, nesterov=False)
+    optimizer = SGD(lr=0.11, momentum=0.9, decay=1e-8, nesterov=False)
     model.compile(optimizer=optimizer,
                   loss='mean_squared_error',
                   )
@@ -145,15 +145,19 @@ if __name__ =='__main__':
         y.append(pca.components_[1][i])
     plt.scatter(x,y)
     
-    base_dir = "./PCA_designed"
+    base_dir = "./designed_pca_loss_grads"
     if not os.path.exists(base_dir):
         os.mkdir(base_dir)
-    
-    np.save("./PCA_designed/model1_x_{}".format(sys.argv[1]), x)
-    np.save("./PCA_designed/model1_y_{}".format(sys.argv[1]), y)
-    np.save("./PCA_designed/model1_loss_{}".format(sys.argv[1]), loss)
-    np.save("./PCA_designed/model1_grads_{}".format(sys.argv[1]), grads)
-    model.save("model1_{}".format(sys.argv[1]))    
+
+    model_base_dir = "./designed_models"
+    if not os.path.exists(model_base_dir):
+        os.mkdir(model_base_dir)
+        
+    np.save(base_dir + "/model1_x_{}".format(sys.argv[1]), x)
+    np.save(base_dir + "/model1_y_{}".format(sys.argv[1]), y)
+    np.save(base_dir + "/model1_loss_{}".format(sys.argv[1]), loss)
+    np.save(base_dir + "/model1_grads_{}".format(sys.argv[1]), grads)
+    model.save(model_base_dir + "/model1_{}.h5".format(sys.argv[1]))
         
         
         

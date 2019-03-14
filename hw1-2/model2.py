@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 #Config
-epochs = 250
+epochs = 10
 batch = 128
 data_size = 10000
 
@@ -142,15 +142,19 @@ if __name__ =='__main__':
         y.append(pca.components_[1][i])
     plt.scatter(x,y)
     
-    base_dir = "./PCA_designed"
+    base_dir = "./designed_pca_loss_grads"
     if not os.path.exists(base_dir):
         os.mkdir(base_dir)
-    
-    np.save("./PCA_designed/model2_x_{}".format(sys.argv[1]), x)
-    np.save("./PCA_designed/model2_y_{}".format(sys.argv[1]), y)
-    np.save("./PCA_designed/model2_loss_{}".format(sys.argv[1]), loss)
-    np.save("./PCA_designed/model2_grads_{}".format(sys.argv[1]), grads)
-    model.save("model2_{}".format(sys.argv[1]))    
+
+    model_base_dir = "./designed_models"
+    if not os.path.exists(model_base_dir):
+        os.mkdir(model_base_dir)
+        
+    np.save(base_dir + "/model2_x_{}".format(sys.argv[1]), x)
+    np.save(base_dir + "/model2_y_{}".format(sys.argv[1]), y)
+    np.save(base_dir + "/model2_loss_{}".format(sys.argv[1]), loss)
+    np.save(base_dir + "/model2_grads_{}".format(sys.argv[1]), grads)
+    model.save(model_base_dir + "/model2_{}.h5".format(sys.argv[1]))   
         
         
         

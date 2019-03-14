@@ -60,7 +60,7 @@ if __name__ == "__main__":
 	x = Dense(10, activation='relu')(inputs)
 	x = Dense(18, activation='relu')(x)
 	x = Dense(15, activation='relu')(x)
-	x = Dense(14, activation='relu')(x)
+	x = Dense(4, activation='relu')(x)
 	predictions = Dense(1, activation='linear')(x)
 
 	model = Model(inputs=inputs, outputs=predictions)

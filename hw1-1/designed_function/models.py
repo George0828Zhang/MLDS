@@ -49,7 +49,7 @@ if __name__ == "__main__":
 	optimizer = SGD(lr=0.01, momentum=0.9, decay=1e-8, nesterov=False)
 	model.compile(loss='mean_squared_error',optimizer=optimizer)
 	history = model.fit(x=np.asarray(data),y=np.asarray(labels), epochs=epoch,batch_size=batch_size)
-   	plt.plot(range(epoch), history.history['loss'])
+	plt.plot(range(epoch), history.history['loss'])
 	model.save("Model0.h5")  
     
     ###########################################################################

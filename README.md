@@ -19,6 +19,7 @@ python3 /hw1-1/plot.py
 jupyter notebook /hw1/hw1-1/CIFAR10/CIFAR10_plot.ipynb
 ```
 (However, the weights to produce weight plot is not available due to large filesize.)
+
 4. To create the models of CIFAR10, open
 ```
 jupyter notebook /hw1/hw1-1/CIFAR10/CIFAR10_DNN1.ipynb

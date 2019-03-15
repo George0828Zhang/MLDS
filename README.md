@@ -30,14 +30,13 @@ python run.py
 python designed_plot.py
 ```
 
-
-1. To show the loss, accuracy, weights, gradient norm plots, open 
+3. To show the loss, accuracy, weights, gradient norm plots, open 
 ```
 jupyter notebook /hw1-1/CIFAR10/CIFAR10_plot.ipynb
 ```
 (However, the weights to produce weight plot is not available due to large filesize.)
 
-2. To show minimal ratio results, open
+4. To show minimal ratio results, open
 ```
 jupyter notebook mini_ratio_experiment.ipynb
 ```

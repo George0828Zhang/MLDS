@@ -6,6 +6,11 @@
 - sklearn 0.20.2 (PCA)
 
 ##### state how to reproduce the result shown in your presentation
+1. To create model .h5 files and loss .npy files, run
+```
+python models.py
+```
+2. To plot the function image and loss image, run
 ```
 python3 /hw1-1/plot.py
 ```

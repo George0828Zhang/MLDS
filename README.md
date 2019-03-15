@@ -21,5 +21,5 @@ jupyter notebook CIFAR10_plot.ipynb
 
 2. To show minimal ratio results, open
 ```
-jupyter notebook 
+jupyter notebook mini_ratio_experiment.ipynb
 ```

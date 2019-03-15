@@ -6,7 +6,9 @@
 - sklearn 0.20.2 (PCA)
 
 ##### state how to reproduce the result shown in your presentation
-
+```
+python3 /hw1-1/plot.py
+```
 
 ### HW 1-2
 ##### toolkits/libraries used and their corresponding version
@@ -15,7 +17,7 @@ Same as 1-1.
 ##### state how to reproduce the result shown in your presentation
 1. To show the loss, accuracy, weights, gradient norm plots, open 
 ```
-jupyter notebook CIFAR10_plot.ipynb
+jupyter notebook /hw1-1/CIFAR10/CIFAR10_plot.ipynb
 ```
 (However, the weights to produce weight plot is not available due to large filesize.)
 

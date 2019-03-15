@@ -14,6 +14,17 @@ python models.py
 ```
 python3 /hw1-1/plot.py
 ```
+3. To show the loss, accuracy, weights, gradient norm plots of CIFAR10, open 
+```
+jupyter notebook /hw1/hw1-1/CIFAR10/CIFAR10_plot.ipynb
+```
+(However, the weights to produce weight plot is not available due to large filesize.)
+4. To create the models of CIFAR10, open
+```
+jupyter notebook /hw1/hw1-1/CIFAR10/CIFAR10_DNN1.ipynb
+jupyter notebook /hw1/hw1-1/CIFAR10/CIFAR10_DNN2.ipynb
+jupyter notebook /hw1/hw1-1/CIFAR10/CIFAR10_SHALLOW1.ipynb
+```
 
 ### HW 1-2
 ##### toolkits/libraries used and their corresponding version
@@ -30,13 +41,7 @@ python run.py
 python designed_plot.py
 ```
 
-3. To show the loss, accuracy, weights, gradient norm plots, open 
+3. To show minimal ratio results, open
 ```
-jupyter notebook /hw1-1/CIFAR10/CIFAR10_plot.ipynb
-```
-(However, the weights to produce weight plot is not available due to large filesize.)
-
-4. To show minimal ratio results, open
-```
-jupyter notebook mini_ratio_experiment.ipynb
+jupyter notebook /hw1/hw1-2/mini_ratio_experiment.ipynb
 ```

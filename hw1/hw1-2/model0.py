@@ -16,7 +16,7 @@ import math
 import matplotlib.pyplot as plt
 
 #Config
-epochs = 400
+epochs = 300
 batch = 128
 data_size = 10000
 
@@ -121,7 +121,8 @@ if __name__ =='__main__':
     model = createModel()   
     
     collect_interval = 3
-    weights = list()
+    weights_whole = list()
+    weights_first = list()
     grads = list()
     loss = list()    
     
@@ -134,19 +135,34 @@ if __name__ =='__main__':
         
         if(cnt%collect_interval == 0):
             w = compressed_weights(model)
-            weights.append(w)
-    
+            weights_whole.append(w)
+            weights_first.append(w[:10])
             
-    pca = PCA(n_components=2)
-    pca.fit(np.transpose(weights))
-    x = []
-    y = []
-    a = pca.components_
-    for i in range(pca.components_.shape[1]):
-        x.append(pca.components_[0][i])
-        y.append(pca.components_[1][i])
-    plt.scatter(x,y)
     
+    ###pca_whole
+    pca_whole = PCA(n_components=2)
+    pca_whole.fit(np.transpose(weights_whole))
+    x_whole = []
+    y_whole = []
+    for i in range(pca_whole.components_.shape[1]):
+        x_whole.append(pca_whole.components_[0][i])
+        y_whole.append(pca_whole.components_[1][i])
+    #plt.scatter(x_whole,y_whole)
+    
+    
+    
+    ###pca_first
+    pca_first = PCA(n_components=2)
+    pca_first.fit(np.transpose(weights_first))
+    x_first = []
+    y_first = []
+    for i in range(pca_first.components_.shape[1]):
+        x_first.append(pca_first.components_[0][i])
+        y_first.append(pca_first.components_[1][i])
+    #plt.scatter(x_first,y_first)
+    
+    
+    ###save data
     base_dir = "./designed_pca_loss_grads"
     if not os.path.exists(base_dir):
         os.mkdir(base_dir)
@@ -155,8 +171,12 @@ if __name__ =='__main__':
     if not os.path.exists(model_base_dir):
         os.mkdir(model_base_dir)
         
-    np.save(base_dir + "/model0_x_{}".format(sys.argv[1]), x)
-    np.save(base_dir + "/model0_y_{}".format(sys.argv[1]), y)
+    np.save(base_dir + "/model0_x_w_{}".format(sys.argv[1]), x_whole)
+    np.save(base_dir + "/model0_y_w_{}".format(sys.argv[1]), y_whole)
+    np.save(base_dir + "/model0_x_f_{}".format(sys.argv[1]), x_first)
+    np.save(base_dir + "/model0_y_f_{}".format(sys.argv[1]), y_first)
+
+    
     np.save(base_dir + "/model0_loss_{}".format(sys.argv[1]), loss)
     np.save(base_dir + "/model0_grads_{}".format(sys.argv[1]), grads)
     model.save(model_base_dir + "/model0_{}.h5".format(sys.argv[1]))

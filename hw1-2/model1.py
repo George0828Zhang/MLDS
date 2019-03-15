@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 #Config
-epochs = 10
+epochs = 400
 batch = 128
 data_size = 10000
 

@@ -20,6 +20,17 @@ python3 /hw1-1/plot.py
 Same as 1-1.
 
 ##### state how to reproduce the result shown in your presentation
+
+1. To create 3 models training on the designed function
+```
+python run.py
+```
+2. To plot the images including PCA, loss, gradients
+```
+python designed_plot.py
+```
+
+
 1. To show the loss, accuracy, weights, gradient norm plots, open 
 ```
 jupyter notebook /hw1-1/CIFAR10/CIFAR10_plot.ipynb

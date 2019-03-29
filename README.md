@@ -46,3 +46,16 @@ python designed_plot.py
 ```
 jupyter notebook /hw1/hw1-2/mini_ratio_experiment.ipynb
 ```
+
+### HW1-3
+####
+- tensorflow 1.12
+- tensorflow.keras
+1. To create the plot and the models of showing MNIST can fit random labels, open 
+```
+jupyter notebook /hw1/hw1-3/MNIST_RANDOM.ipynb
+```
+2. To show parameters amount versus model performance, open
+```
+jupyter notebook /hw1/hw1-3/MNIST_GENERALIZATION.ipynb
+```

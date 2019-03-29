@@ -59,11 +59,19 @@ jupyter notebook /hw1/hw1-3/MNIST_RANDOM.ipynb
 ```
 jupyter notebook /hw1/hw1-3/MNIST_GENERALIZATION.ipynb
 ```
-3. To create the the requierments of showing sharpness versus batch size
+3. To create train and plot for the task "flatness vs generalization part 1"
+```
+jupyter notebook /hw1/hw1-3/flatness/Flatness_pt1.ipynb
+```
+4.To create train and plot for the task "flatness vs generalization part 2"
+```
+jupyter notebook /hw1/hw1-3/flatness/Flatness_pt2.ipynb
+```
+5. To create the the requierments of showing sharpness versus batch size
 ```
 python /hw1/hw1-3/bonus/hes.py
 ```
-4. To create the plot of showing sharpness versus batch size
+6. To create the plot of showing sharpness versus batch size
 ```
 python /hw1/hw1-3/bonus/hes_plot.py
 ```

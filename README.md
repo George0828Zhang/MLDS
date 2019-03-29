@@ -59,3 +59,11 @@ jupyter notebook /hw1/hw1-3/MNIST_RANDOM.ipynb
 ```
 jupyter notebook /hw1/hw1-3/MNIST_GENERALIZATION.ipynb
 ```
+3. To create the the requierments of showing sharpness versus batch size
+```
+python /hw1/hw1-3/bonus/hes.py
+```
+4. To create the plot of showing sharpness versus batch size
+```
+python /hw1/hw1-3/bonus/hes_plot.py
+```

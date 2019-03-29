@@ -55,7 +55,7 @@ jupyter notebook /hw1/hw1-2/mini_ratio_experiment.ipynb
 ```
 jupyter notebook /hw1/hw1-3/MNIST_RANDOM.ipynb
 ```
-2. To show parameters amount versus model performance, open
+2. To create the plot and the models of showing parameters amount versus model performance, open
 ```
 jupyter notebook /hw1/hw1-3/MNIST_GENERALIZATION.ipynb
 ```

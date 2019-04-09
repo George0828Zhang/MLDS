@@ -12,12 +12,16 @@ DIC_word_index = {}
 
 BOS = "<bos>"
 EOS = "<eos>"
+PAD = "<pad>"
+UNK = "<unk>"
 
 DIC_word_index[BOS] = 0
 DIC_word_index[EOS] = 1
+DIC_word_index[PAD] = 2
+DIC_word_index[UNK] = 3
 
 #======Read json file, tokenize and add it to DIC
-index = 2 
+index = 4
 rawlabels = json.load(open(labelfilename, 'r'))
 for data in rawlabels:
     for caption in data['caption']:

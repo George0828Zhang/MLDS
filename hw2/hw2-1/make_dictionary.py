@@ -1,7 +1,7 @@
 import json
-#import nltk
-#from nltk import word_tokenize
-import re
+import nltk
+from nltk import word_tokenize
+#import re
 idfilename = 'training_data/id.txt'
 datadirname = 'training_data/feat/'
 labelfilename = 'training_label.json'
@@ -15,20 +15,17 @@ EOS = "<eos>"
 PAD = "<pad>"
 UNK = "<unk>"
 
-#start from 1, because padding will pad zero into it.
-
+DIC_word_index[PAD] = 0
 DIC_word_index[BOS] = 1
 DIC_word_index[EOS] = 2
-DIC_word_index[PAD] = 3
-DIC_word_index[UNK] = 4
+DIC_word_index[UNK] = 3
 
 #======Read json file, tokenize and add it to DIC
-index = 5
+index = 4
 rawlabels = json.load(open(labelfilename, 'r'))
 for data in rawlabels:
     for caption in data['caption']:
-        caption = re.sub(r'[^\w\s\<\>\-]','',caption)
-        tokens = caption.lower().split()
+        tokens = word_tokenize(caption.lower())
         for word in tokens:
             if word not in DIC_word_index:
                 DIC_word_index[word] = index

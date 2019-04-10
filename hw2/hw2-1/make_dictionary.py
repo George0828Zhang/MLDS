@@ -15,12 +15,10 @@ EOS = "<eos>"
 PAD = "<pad>"
 UNK = "<unk>"
 
-#start from 1, because padding will pad zero into it.
-
+DIC_word_index[PAD] = 0
 DIC_word_index[BOS] = 1
 DIC_word_index[EOS] = 2
-DIC_word_index[PAD] = 3
-DIC_word_index[UNK] = 4
+DIC_word_index[UNK] = 3
 
 #======Read json file, tokenize and add it to DIC
 index = 5

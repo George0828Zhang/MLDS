@@ -80,8 +80,15 @@ python /hw1/hw1-3/bonus/hes_plot.py
 #### toolkits
 - tensorflow 1.12
 - tensorflow.keras
-
-1. To train the basic seq2seq model, run
+1. To create dictionary
+```
+python make_dictionary.py
+```
+2. To train the basic seq2seq model, run
 ```
 jupyter notebook /hw2/hw2-1/Training.ipynb
+```
+3. To train the best model
+```
+jupyter notebook /hw2/hw2-1/Training_v2.ipynb
 ```

@@ -75,3 +75,13 @@ python /hw1/hw1-3/bonus/hes.py
 ```
 python /hw1/hw1-3/bonus/hes_plot.py
 ```
+
+### HW2-1
+#### toolkits
+- tensorflow 1.12
+- tensorflow.keras
+
+1. To train the basic seq2seq model, run
+```
+jupyter notebook /hw2/hw2-1/Training.ipynb
+```

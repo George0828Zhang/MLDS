@@ -119,3 +119,5 @@ jupyter notebook /hw2/hw2-2/Bidirectional.ipynb
 ```
 jupyter notebook /hw2/hw2-2/BiAttBatchInference.ipynb
 ```
+Trained model:
+https://drive.google.com/file/d/1F5qJIRapmbtjSwDPvA8NY0ua_xVFxvQM/view?usp=sharing

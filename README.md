@@ -92,3 +92,32 @@ jupyter notebook /hw2/hw2-1/Training.ipynb
 ```
 jupyter notebook /hw2/hw2-1/Training_v2.ipynb
 ```
+
+### HW2-2
+### toolkits
+- pytorch 1.0.1
+1. Run the WordEmbedding.ipynb
+```
+jupyter notebook /hw2/hw2-2/WordEmbedding.ipynb
+```
+Generate:
+vocab.json
+wv_matrix100d.npy
+2. Train unidirectional model, run
+```
+jupyter notebook /hw2/hw2-2/pytorch_version.ipynb
+```
+3. Infer unidirectional model, run
+```
+jupyter notebook /hw2/hw2-2/BatchInference.ipynb
+```
+4. Train bidirectional model, run
+```
+jupyter notebook /hw2/hw2-2/Bidirectional.ipynb
+```
+5. Infer bidirectional model, run
+```
+jupyter notebook /hw2/hw2-2/BiAttBatchInference.ipynb
+```
+Trained model:
+https://drive.google.com/file/d/1F5qJIRapmbtjSwDPvA8NY0ua_xVFxvQM/view?usp=sharing

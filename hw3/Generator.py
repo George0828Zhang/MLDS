@@ -1,41 +1,60 @@
 import torch
+import torch.nn as nn
 import numpy as np
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
+
 class MyGenerator(torch.nn.Module):
     def __init__(self, img_shape, latent_dim):
         super(MyGenerator, self).__init__()
+        self.hidden_dim = 128
+        self.img_shape = img_shape;      
         
-        self.img_shape = img_shape;
+        self.relu = torch.nn.LeakyReLU()
+        self.dropout= torch.nn.Dropout(p=0.2, inplace=False)
+
+       
+        #self.Upsample = torch.nn.Upsample(scale_factor=2, mode='nearest')
+        self.linear = torch.nn.Linear(latent_dim, 128*16*16)
+        self.deconv = nn.ConvTranspose2d(128, 128, 2, stride=2)
+        self.conv2d_1 = torch.nn.Conv2d(128, 128, 4, padding =1 )
+        self.conv2d_2 = torch.nn.Conv2d(128, 64, 4, padding = 1)
+        self.conv2d_3 = torch.nn.Conv2d(64, 3, 4, padding = 3)
+        self.BN=torch.nn.BatchNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
         
-        self.model = torch.nn.Sequential(
-            torch.nn.Linear(latent_dim, 1024),
-            torch.nn.ReLU(),
-            torch.nn.Linear(1024, int(np.prod(self.img_shape))),
-            torch.nn.Tanh()
-        )
-    def forward(self, z):
-        img = self.model(z)
-        img = img.view(z.shape[0], self.img_shape[0], self.img_shape[1], self.img_shape[2])
-        return img
-#     def __init__(self):
-#         super(Generator, self).__init__()
+        self.tanh = torch.nn.Tanh()
+
+    def forward(self, x):
+        #print(x.shape)
+        x = self.linear(x)
+        x = self.relu(x).view(x.shape[0],128,16,16)
+        x = self.dropout(x)
+        #x = self.Upsample(x)
+        
+        x = self.deconv(x)
+        #print(x.shape)
+        
+        x = self.conv2d_1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        #print(x.shape)
+        #x = self.Upsample(x)
+        
+        x = self.deconv(x)
+        #print(x.shape)
+        
+        x = self.conv2d_2(x)
+        #print(x.shape)
+        x = self.relu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2d_3(x)
+        
+        x = self.BN(x)
+        x = self.tanh(x)
 
 
-#         self.linear = torch.nn.Linear(100, 128*16*16)
-#         self.relu = torch.nn.ReLU()
-#         self.Upsample = torch.nn.Upsample(scale_factor=2, mode='nearest')  
-#         self.conv2d_1 = torch.nn.Conv2d(128, 128, 4)
-#         self.conv2d_2 = torch.nn.Conv2d(256, 64, 4)
-#         self.conv2d_3 = torch.nn.Conv2d(128, 3, 4)
-#         self.tanh = torch.nn.Tanh()
-#     def forward(self, x):
 #         print(x.shape)
-#         x = self.linear(x)
-#         print(x.shape)
-#         x = self.relu(x).view(16,16,128)
-#         x = self.Upsample(x)
-#         x = self.conv2d_1(x)
-#         x = self.relu(x)
-#         x = self.Upsample(x)
-#         x = self.conv2d_2(x)
-#         x = self.tanh(x)
-#         return x
+#         input("")
+        return x.transpose(2,1).transpose(3,2)

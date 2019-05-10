@@ -3,16 +3,28 @@ import numpy as np
 class MyDiscriminator(torch.nn.Module):
     def __init__(self, img_shape):
         super(MyDiscriminator, self).__init__()
-
-        self.model = torch.nn.Sequential(
-            torch.nn.Linear(int(np.prod(img_shape)), 1024),
-            torch.nn.LeakyReLU(0.2, inplace=True),
-            torch.nn.Linear(1024, 256),
-            torch.nn.LeakyReLU(0.2, inplace=True),
-            torch.nn.Linear(256, 1),
+        self.hidden_dim = 128
+        #int(np.prod(img_shape))
+        self.model = torch.nn.Sequential(            
+            torch.nn.Conv2d(3, self.hidden_dim, 5, stride=2, padding=2),            
+            torch.nn.LeakyReLU(inplace=True),
+            torch.nn.Conv2d(self.hidden_dim, self.hidden_dim * 2, 5, stride=2, padding=2),
+            torch.nn.LeakyReLU(True),
+            torch.nn.BatchNorm2d(self.hidden_dim * 2, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+            torch.nn.Conv2d(2 * self.hidden_dim, 4 * self.hidden_dim, 5, stride=2, padding=2),
+            torch.nn.LeakyReLU(True),
         )
-
+        self.linear = torch.nn.Linear(4 * self.hidden_dim * 8 * 8, 1)
+        
     def forward(self, img):
-        img_flat = img.view(img.shape[0], -1)
-        validity = self.model(img_flat)
-        return validity  
+        #print("dis")
+        if(img.shape[1] != 3):
+            img = img.transpose(3,2).transpose(2,1)
+        out = self.model(img)
+        #print(out.shape) 
+        out = out.view(img.shape[0], -1)
+        #print(img.shape[0])
+        #print(out.shape)
+        out = self.linear(out)
+        #print(out.shape) 
+        return out.squeeze(-1)  

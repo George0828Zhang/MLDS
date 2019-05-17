@@ -11,7 +11,7 @@ class MyGenerator(torch.nn.Module):
         #self.hidden_dim = 128
         self.img_shape = img_shape;      
         
-        self.relu = torch.nn.LeakyReLU()
+        self.relu = torch.nn.ReLU()
         self.dropout= torch.nn.Dropout(p=0.2, inplace=False)
 
        

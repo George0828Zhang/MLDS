@@ -10,6 +10,7 @@ from PIL import Image
 from IPython.display import display
 from torch.autograd import Variable
 from torch.autograd import grad as torch_grad
+from random import sample
 #from tensorboardX import SummaryWriter
 
 
@@ -35,9 +36,9 @@ class DCGAN():
         self.optimizer_D = torch.optim.Adam(self.D.parameters(), lr = 0.0002)
         
         #fixed noise to generate 25 images for checking
-        self.fixed_noise = torch.tensor(np.random.normal(0, 1, (25, self.latent_dim)), dtype=torch.float32, device = self.device)
+        self.fixed_noise = torch.tensor(np.random.normal(0, 1, (5, self.latent_dim)), dtype=torch.float32, device = self.device)
         
-        self.loss_F = torch.nn.BCELoss()
+        self.loss_F = torch.nn.BCEWithLogitsLoss(weight=None, size_average=None, reduce=None, reduction='mean',pos_weight=None)
         
         self.epoch = 0;
         
@@ -52,8 +53,9 @@ class DCGAN():
         self.epoch = saved_model['epoch']
 
     
-    def train_D(self, X_train):
+    def train_D(self, batch, miss_labels):
         ## train discriminator
+        #print(len(tag))
         
         for p in self.D.parameters():  # reset requires_grad
             p.requires_grad = True  # they are set to False below in train_G update
@@ -62,17 +64,12 @@ class DCGAN():
             p.requires_grad = False  
             
         
-        real_images = X_train.float().to(self.device)
-        
-
-        #real_images = torch.tensor(real_images_tp, dtype=torch.float32, device = self.device)
-#         print(X_train)
-#         print(real_images)
-        
+        real_images = batch['image']
+        tag = batch['tag']        
 
         
-        gen_noise = torch.tensor(np.random.normal(0, 1, (self.batch_size, self.latent_dim)), dtype=torch.float32, device = self.device)
-        fake_images = self.G(gen_noise.detach())
+        gen_noise = torch.tensor(np.random.normal(0, 1, (tag.shape[0], self.latent_dim)), dtype=torch.float32, device = self.device)
+        fake_images = self.G(gen_noise.detach(), tag)
         
 #         with self.writer as w:
 #             w.add_graph(self.D, real_images)
@@ -107,23 +104,28 @@ class DCGAN():
         #gradient_penalty = self._gradient_penalty(real_images, fake_images)
         self.optimizer_D.zero_grad()
         
-        real_score = self.D(real_images)
-        fake_score = self.D(fake_images)
-      
+        
+        #score can be from -inf ~ inf, discriminator has no sigmoid, but loss_F has sigmoid
+        real_score = self.D(real_images, tag)
+        fake_score = self.D(fake_images, tag)
+        wrong_label = self.D(miss_labels, tag)
 
         d_real_loss = self.loss_F(real_score, torch.ones(real_score.shape[0]).to(self.device))
         d_real_loss.backward();
         
         d_fake_loss = self.loss_F(fake_score, torch.zeros(fake_score.shape[0]).to(self.device))
         d_fake_loss.backward();
-               
-        batch_d_loss = d_fake_loss + d_real_loss
+        
+        d_miss_loss = self.loss_F(wrong_label, torch.zeros(fake_score.shape[0]).to(self.device))
+        d_miss_loss.backward();
+        
+        batch_d_loss = d_fake_loss + d_real_loss + d_miss_loss
         
         self.optimizer_D.step();
         
         return batch_d_loss, real_score, fake_score
         
-    def train_G(self):
+    def train_G(self, tag):
         # train generator
         # gaussian noise
         for p in self.G.parameters():  # reset requires_grad
@@ -132,13 +134,13 @@ class DCGAN():
         for p in self.D.parameters():
             p.requires_grad = False  # to avoid computation
             
-        noise = torch.tensor(np.random.normal(0, 1, (self.batch_size, self.latent_dim)), dtype=torch.float32, device = self.device) 
+        noise = torch.tensor(np.random.normal(0, 1, (tag.shape[0], self.latent_dim)), dtype=torch.float32, device = self.device) 
 
         self.optimizer_G.zero_grad()
 
         # Generate a batch of images
-        gen_imgs = self.G(noise)
-#         image = gen_imgs[0, :, :, :].cpu().detach().numpy()
+        gen_images = self.G(noise, tag)
+#         image = gen_images[0, :, :, :].cpu().detach().numpy()
 #         image = np.reshape(image, [self.height, self.width, self.channels])
 #         plt.imshow(image)
 #         plt.show()
@@ -146,16 +148,18 @@ class DCGAN():
         
 
             
-        batch_g_loss = self.loss_F(self.D(gen_imgs), torch.ones(self.batch_size).to(self.device));
+        batch_g_loss = self.loss_F(self.D(gen_images, tag), torch.ones(tag.shape[0]).to(self.device));
         
         batch_g_loss.backward()
         self.optimizer_G.step()
 
         return batch_g_loss
         
-    def _run_epoch(self, dataloader, D_iters, training = True):
+    def _run_epoch(self, datas, D_iters, training = True):
         self.D.train(training)
         self.G.train(training)
+        
+        dataloader = torch.utils.data.DataLoader(datas, batch_size = self.batch_size, shuffle = True, collate_fn = self.my_collate_fn)
         
         if training:
             iter_in_epoch = min(len(dataloader), 1000000)
@@ -169,9 +173,7 @@ class DCGAN():
         d_loss_sum = 0;
         d_real_sum = 0;
         d_fake_sum = 0;
-        
-        
-        
+
         for i, batch in trange:            
             
             
@@ -183,7 +185,11 @@ class DCGAN():
                 #plt.imshow(batch[0])
                 #plt.show()
                 for d_ct in range(D_iters):
-                    d_loss,d_real,d_fake = self.train_D(batch);
+
+                    random_batch = sample(datas, len(batch['tag']))
+                    random_img_batch = torch.tensor([data['image'] for data in random_batch]).float().to(self.device)
+
+                    d_loss,d_real,d_fake = self.train_D(batch, random_img_batch);
                     d_loss_sum += d_loss.item()
                     d_real_sum += d_real.mean().item()
                     d_fake_sum += d_fake.mean().item()
@@ -191,7 +197,7 @@ class DCGAN():
                 d_real_sum /= D_iters;   
                 d_fake_sum /= D_iters;   
                 
-                g_loss_sum += self.train_G().item();
+                g_loss_sum += self.train_G(batch['tag']).item();
             else:
                 with torch.no_grad():
                     
@@ -212,6 +218,12 @@ class DCGAN():
         d_fake_sum /= iter_in_epoch
         return d_loss_sum, g_loss_sum, d_real_sum, d_fake_sum
 
+    def my_collate_fn(self, datas):
+        batch = {}
+        
+        batch['image'] = torch.tensor([data['image'] for data in datas]).float().to(self.device)
+        batch['tag'] = torch.tensor([data['tag'] for data in datas]).float().to(self.device)
+        return batch
     
     def train(self, datas, epochs=10000, batch_size = 256, save_interval = 1):
         
@@ -224,11 +236,11 @@ class DCGAN():
          
         
         while(self.epoch < epochs):
-            dataloader = torch.utils.data.DataLoader(datas, batch_size = batch_size, shuffle = True)
+            
             
             D_iters = self.D_update_times;
             
-            d_loss, g_loss, d_real_loss, d_fake_loss = self._run_epoch(dataloader, D_iters, True)
+            d_loss, g_loss, d_real_loss, d_fake_loss = self._run_epoch(datas, D_iters, True)
             print ('epoch: %d, [Discriminator :: d_loss: %f], [Generator :: loss: %f], [d_fake :: score: %f], [d_real :: score: %f]' % (self.epoch, d_loss, g_loss, d_fake_loss, d_real_loss))
             
 
@@ -251,11 +263,24 @@ class DCGAN():
         if not os.path.exists("./DCGANimages"):
             os.makedirs("./DCGANimages")
         filename = "./DCGANimages/animate_%d.png" % step
-
+        """
+        #'black hair purple eyes'    : 89,
+        #'pink hair black eyes'      : 94,
+        #'red hair red eyes'         : 121,
+        #'aqua hair green eyes'      : 100,
+        #'blonde hair orange eyes'   : 2
+        """
+        tags = np.zeros((5,130))
+        tags[0][89] = 1
+        tags[1][94] = 1
+        tags[2][121] = 1
+        tags[3][100] = 1
+        tags[4][2] = 1
+        tags_tensor = torch.tensor(tags).float().to(self.device)
         #with torch.no_grad():
-        images = self.G(self.fixed_noise)
+        images = self.G(self.fixed_noise, tags_tensor)
         #images is in -1 ~ 1
-        rows = 5
+        rows = 1
         #turn -1 ~ 1 to 0 ~ 255
         image = (1 + images.cpu().detach().numpy())/2 * 255
         #image = np.reshape(image, [self.height, self.width, self.channels])
@@ -263,17 +288,28 @@ class DCGAN():
         int_X = int_X.reshape(rows, -1, self.height, self.width, self.channels)
         #print(int_X.shape)
         int_X = int_X.swapaxes(1,2).reshape(rows*self.height,-1, self.channels)
-        img = Image.fromarray(int_X)
+        image = Image.fromarray(int_X)
+
+        
+        print(np.where(tags==1))
+        a = torch.nn.functional.sigmoid(self.D(images, tags_tensor))
+        b = torch.ones(tags_tensor.shape[0]).to(self.device)
+        print(a)
+
+        batch_g_loss = self.loss_F(a, b);
+        print("plot g loss",batch_g_loss)
+        
+
         
 
             
         
         if save2file:
-            img.save(filename)
+            image.save(filename)
             print("plot figure:")           
-            display(img)
+            display(image)
         else:
             print("plot figure:")           
-            display(img)
-            #print(img.shape)
+            display(image)
+            #print(image.shape)
 

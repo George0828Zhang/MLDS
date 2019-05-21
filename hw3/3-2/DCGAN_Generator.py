@@ -12,18 +12,19 @@ class MyGenerator(torch.nn.Module):
         self.img_shape = img_shape;   
         self.latent_dim = latent_dim
         self.text_dim = text_dim
+        self.emb_dim = 256
         
         #self.Relu = nn.ReLU(True);
         #self.linear = torch.nn.Linear(latent_dim, self.hidden_dim* 4* 4)
         
         self.embed = nn.Sequential(
-            nn.Linear(text_dim, 256),
+            nn.Linear(text_dim, self.emb_dim),
             nn.ReLU(True)
         )
         
         self.mlp = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d( latent_dim + text_dim, self.hidden_dim * 8, 4, 1, 0, bias=False),
+            nn.ConvTranspose2d( latent_dim + self.emb_dim, self.hidden_dim * 8, 4, 1, 0, bias=False),
             nn.BatchNorm2d(self.hidden_dim * 8),
             nn.ReLU(True),
             # state size. (self.hidden_dim*8) x 4 x 4
@@ -52,11 +53,11 @@ class MyGenerator(torch.nn.Module):
         
         #expect (batch, 119)
         emb = self.embed(txt)
-        print("[debug][gen]",emb.shape)
+        #print("[debug][gen]",emb.shape)
         #expect (batch, 256)
         
-        x = x.reshape(-1, self.latent_dim, 1, 1);
-        emb = emb.view(batch_size, self.text_dim, 1, 1)
+        x = x.reshape(batch_size, self.latent_dim, 1, 1);
+        emb = emb.view(batch_size, self.emb_dim, 1, 1)
         
         x = torch.cat((x, emb), 1)
         

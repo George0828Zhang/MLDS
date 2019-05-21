@@ -8,9 +8,10 @@ class MyDiscriminator(torch.nn.Module):
         #int(np.prod(img_shape))
         self.n_channel = 3
         self.text_dim = text_dim
+        self.emb_dim = 256
         
         self.embed = nn.Sequential(
-            nn.Linear(text_dim, 256),
+            nn.Linear(text_dim, self.emb_dim),
             nn.ReLU(True)
         )
         
@@ -36,31 +37,41 @@ class MyDiscriminator(torch.nn.Module):
             #nn.Sigmoid()
         )
         
+        #since using BCELogitloss there is no need sigmoid
         self.mlp_part2 = nn.Sequential(
             # state size. (self.hidden_dim*8) x 4 x 4
-            nn.Conv2d(self.hidden_dim * 8 + text_dim, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid()
+            nn.Conv2d(self.hidden_dim * 8 + self.emb_dim, 1, 4, 1, 0, bias=False),
+            #nn.Sigmoid()
         )
         
     def forward(self, img, txt):
-        batch_size = img.shape[0]
-        #expect (batch, 119)
-        emb = self.embed(txt)
-        print("[debug][dis]",emb.shape)
-        #expect (batch, 256)
+        #print(img.shape)
+        #print(txt.shape)
         
-        #print("dis")
         if(img.shape[1] != 3):
             img = img.transpose(3,2).transpose(2,1)
+        
+        batch_size = img.shape[0]
+
+        
+        emb = self.embed(txt)
+            
+        #expect (batch, 256)
+        #print("[debug][dis]",emb.shape)      
+        
+        #print("dis")
+
             
         out = self.mlp_part1(img)
         
+        emb = emb.view(batch_size, self.emb_dim, 1, 1)
         emb = emb.repeat(1,1,4,4)
-        print("[debug][dis]",emb.shape)
+        #print("[debug][dis]",emb.shape)
         
-        
+        #print("[debug][dis]",out.shape)
+       
         out = torch.cat((out, emb), 1)
         
-        
-        
-        return out.squeeze(-1)  
+        out = self.mlp_part2(out)
+
+        return out.view(batch_size)  

@@ -31,10 +31,10 @@ class Generator(nn.Module):
         
         
         self.fc = nn.Sequential(
-                nn.Linear(self.noise_dim, 1024),
-                nn.BatchNorm1d(1024),
+                nn.Linear(self.noise_dim, 512),
+                nn.BatchNorm1d(512),
                 nn.ReLU(),
-                nn.Linear(1024, (self.input_size//4) * (self.input_size//4) * 128),
+                nn.Linear(512, (self.input_size//4) * (self.input_size//4) * 128),
                 nn.BatchNorm1d((self.input_size//4) * (self.input_size//4)*128),
                 nn.ReLU(),                
                 )
@@ -73,10 +73,10 @@ class Discriminator(nn.Module):
                 nn.ReLU()
                 )
         self.fc = nn.Sequential(
-                nn.Linear(128 * (self.input_size//4) * (self.input_size//4), 1024) ,
-                nn.BatchNorm1d(1024),
-                nn.ReLU(0.2),
-                nn.Linear(1024, self.output_dim)
+                nn.Linear(128 * (self.input_size//4) * (self.input_size//4), 512) ,
+                nn.BatchNorm1d(512),
+                nn.ReLU(),
+                nn.Linear(512, self.output_dim)
                 )
         utils.initialize_weights(self)
        
@@ -90,8 +90,8 @@ class Discriminator(nn.Module):
 class LSGAN(object):
     def __init__(self, Data_Train):
         self.epoch = 50000
-        self.batch_size = 150
-        self.noise_dim = 100
+        self.batch_size = 25
+        self.noise_dim = 30
         
         # load datasets
         self.dataloader = DataLoader(dataset=Data_Train, batch_size=self.batch_size, shuffle=True)
@@ -108,7 +108,7 @@ class LSGAN(object):
         self.LS_loss = nn.MSELoss().to(device)
         
         print('---------- Networks architecture -------------')
-        summary(self.G, (100,))
+        summary(self.G, (self.noise_dim,))
         summary(self.D, (3,96,96))
         print('-----------------------------------------------')
         

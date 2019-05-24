@@ -21,5 +21,6 @@ def load_training_data(root_dir):
         for file in files:
             if file.find('jpg'):
                 image = cv2.imread(root_dir + "/" + file,1)
-                data_train.append(image)
+                RGB_im = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                data_train.append(RGB_im/255 * 2 - 1 )
     return data_train

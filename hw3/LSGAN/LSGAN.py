@@ -31,7 +31,10 @@ class Generator(nn.Module):
         
         
         self.fc = nn.Sequential(
-                nn.Linear(self.noise_dim, (self.input_size//4) * (self.input_size//4) * 128),
+                nn.Linear(self.noise_dim, 1024),
+                nn.BatchNorm1d(1024),
+                nn.ReLU(),
+                nn.Linear(1024, (self.input_size//4) * (self.input_size//4) * 128),
                 nn.BatchNorm1d((self.input_size//4) * (self.input_size//4)*128),
                 nn.ReLU(),                
                 )
@@ -64,13 +67,16 @@ class Discriminator(nn.Module):
         
         self.convs = nn.Sequential(
                 nn.Conv2d(self.input_dim, 64, kernel_size=4, stride=2, padding=1),
-                nn.LeakyReLU(0.2),
+                nn.ReLU(),
                 nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),
                 nn.BatchNorm2d(128),
-                nn.LeakyReLU(0.2)
+                nn.ReLU()
                 )
         self.fc = nn.Sequential(
-                nn.Linear(128 * (self.input_size//4) * (self.input_size//4), self.output_dim) ,
+                nn.Linear(128 * (self.input_size//4) * (self.input_size//4), 1024) ,
+                nn.BatchNorm1d(1024),
+                nn.ReLU(0.2),
+                nn.Linear(1024, self.output_dim)
                 )
         utils.initialize_weights(self)
        
@@ -83,8 +89,8 @@ class Discriminator(nn.Module):
 
 class LSGAN(object):
     def __init__(self, Data_Train):
-        self.epoch = 500
-        self.batch_size = 100    
+        self.epoch = 50000
+        self.batch_size = 150
         self.noise_dim = 100
         
         # load datasets
@@ -125,11 +131,9 @@ class LSGAN(object):
         self.y_fake_ = self.y_fake_.to(device)
         
         
-        self.D.train()
         print("Training Start !!!")
         total_start_time = time.time()
         for epoch in range(self.epoch):
-            self.G.train()
             epoch_start_time = time.time()
             
             for step, batch_x in enumerate(self.dataloader): 
@@ -142,22 +146,31 @@ class LSGAN(object):
                 batch_noise = batch_noise.cuda()
                 
                 #===== train D =====#
+                self.G.eval()
+                self.D.train()
+                
                 self.D_optimizer.zero_grad() #gradient initialization
                 D_real = self.D(batch_x)
                 D_real_loss = self.LS_loss(D_real, self.y_real_)
+                D_real_loss.backward()
+                
                 
                 G_output = self.G(batch_noise)
-                D_fake = self.D(G_output)
+                D_fake = self.D(G_output.detach())
                 D_fake_loss = self.LS_loss(D_fake, self.y_fake_)
+                D_fake_loss.backward()
                 
                 D_total_loss = D_real_loss + D_fake_loss
                 self.train_hist["D_loss"].append(D_total_loss.item())
                 
-                D_total_loss.backward()
+                
                 self.D_optimizer.step()
                 
                 
                 #===== train G =====#
+                self.G.train()
+                self.D.eval()
+                
                 self.G_optimizer.zero_grad()
                 G_output = self.G(batch_noise)
                 D_fake = self.D(G_output)
@@ -183,7 +196,7 @@ class LSGAN(object):
 
                 
                 
-            if epoch % 10 == 0:
+            if epoch % 2 == 0:
                 print("epoch : ", epoch)
                 print("saving model...")
                 with torch.no_grad():
@@ -206,7 +219,7 @@ class LSGAN(object):
             samples = self.G(self.sample_noise)
         
         else:
-            sample_noise = torch.rand((self.batch_size, self.noise_dim))
+            sample_noise = torch.rand((self.batch_size, self.noise_dim)) # [0,1)
             sample_noise = sample_noise.to(device)
             
             samples = self.G(sample_noise)

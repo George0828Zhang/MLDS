@@ -24,34 +24,51 @@ Data_Train = TensorDataset(Data_Train)
 
         
 class Generator(nn.Module):
-    def __init__(self, noise_dim=100, input_size=96):
+    def __init__(self, noise_dim=100, input_size=65):
         super().__init__()
         self.noise_dim = noise_dim
         self.input_size = input_size
         
         
-        self.fc = nn.Sequential(
-                nn.Linear(self.noise_dim, 512),
-                nn.BatchNorm1d(512),
-                nn.ReLU(),
-                nn.Linear(512, (self.input_size//4) * (self.input_size//4) * 128),
-                nn.BatchNorm1d((self.input_size//4) * (self.input_size//4)*128),
-                nn.ReLU(),                
+        
+        self.fc = nn.Sequential(                
+                nn.Linear(self.noise_dim, 5*5*128),
+                nn.BatchNorm1d(5*5*128)                
                 )
         
         self.deconvs = nn.Sequential(                
-                nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
-                nn.BatchNorm2d(64),            
+                nn.ConvTranspose2d(128, 128, kernel_size=3, stride=2, padding=1),
+                nn.BatchNorm2d(128),            
                 nn.ReLU(),
                 
-                nn.ConvTranspose2d(64, 3, kernel_size=4, stride=2, padding=1),
-                nn.Tanh(),                
+                nn.ConvTranspose2d(128, 128, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(128),
+                nn.ReLU(),
+                
+                nn.ConvTranspose2d(128, 128, kernel_size=3, stride=2, padding=1),
+                nn.BatchNorm2d(128),            
+                nn.ReLU(),
+                
+                nn.ConvTranspose2d(128, 128, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(128),
+                nn.ReLU(),
+                
+                nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1),
+                nn.BatchNorm2d(64),
+                nn.ReLU(),
+                
+                nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1),
+                nn.BatchNorm2d(32),
+                nn.ReLU(),
+                
+                nn.ConvTranspose2d(32, 3,kernel_size=3, stride=1, padding=1),                               
+                nn.Tanh()
                  )
         utils.initialize_weights(self)
     
     def forward(self, z):
         output = self.fc(z)
-        output = output.view(-1, 128, (self.input_size//4), (self.input_size//4)) # (batch_size, channel, , )
+        output = output.view(-1, 128, 5, 5) # (batch_size, channel, , )
         output = self.deconvs(output)
         return output
     
@@ -59,30 +76,37 @@ class Generator(nn.Module):
     
     
 class Discriminator(nn.Module):
-    def __init__(self, input_dim=3, output_dim=1, input_size=96):
+    def __init__(self, input_dim=3, output_dim=1, input_size=65):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.input_size = input_size
         
         self.convs = nn.Sequential(
-                nn.Conv2d(self.input_dim, 64, kernel_size=4, stride=2, padding=1),
+                nn.Conv2d(self.input_dim, 32, kernel_size=5, stride=2, padding=1),
+                nn.BatchNorm2d(32),
                 nn.ReLU(),
-                nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),
+                
+                nn.Conv2d(32, 64, kernel_size=5, stride=2, padding=1),
+                nn.BatchNorm2d(64),
+                nn.ReLU(),
+                
+                nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=1),
                 nn.BatchNorm2d(128),
+                nn.ReLU(),
+                
+                nn.Conv2d(128,256, kernel_size=5, stride=2, padding=1),
+                nn.BatchNorm2d(256),
                 nn.ReLU()
                 )
         self.fc = nn.Sequential(
-                nn.Linear(128 * (self.input_size//4) * (self.input_size//4), 512) ,
-                nn.BatchNorm1d(512),
-                nn.ReLU(),
-                nn.Linear(512, self.output_dim)
+                nn.Linear(256*3*3, 1)
                 )
         utils.initialize_weights(self)
        
     def forward(self,i):
         output = self.convs(i)
-        output = output.view(-1, 128 * (self.input_size//4) * (self.input_size//4))
+        output = output.view(-1, output.shape[1] * output.shape[2] * output.shape[3])
         output = self.fc(output)
         return output
         
@@ -99,17 +123,17 @@ class LSGAN(object):
         
         
         #network init
-        self.G = Generator(noise_dim=self.noise_dim, input_size=96)
-        self.D = Discriminator(input_dim=3, input_size=96)
-        self.G_optimizer = optim.Adam(self.G.parameters(), lr=0.0002)
-        self.D_optimizer = optim.Adam(self.D.parameters(), lr=0.0002)
+        self.G = Generator(noise_dim=self.noise_dim, input_size=65)
+        self.D = Discriminator(input_dim=3, input_size=65)
+        self.G_optimizer = optim.Adam(self.G.parameters(), lr=0.00004)
+        self.D_optimizer = optim.Adam(self.D.parameters(), lr=0.00004)
         self.G = self.G.to(device)
         self.D = self.D.to(device)
         self.LS_loss = nn.MSELoss().to(device)
         
         print('---------- Networks architecture -------------')
         summary(self.G, (self.noise_dim,))
-        summary(self.D, (3,96,96))
+        summary(self.D, (3,65,65))
         print('-----------------------------------------------')
         
         
@@ -133,10 +157,12 @@ class LSGAN(object):
         
         print("Training Start !!!")
         total_start_time = time.time()
+        self.D.train()
         for epoch in range(self.epoch):
             epoch_start_time = time.time()
-            
+            self.G.train()
             for step, batch_x in enumerate(self.dataloader): 
+                
                 if step == self.dataloader.dataset.__len__() // self.batch_size:
                     break
                 
@@ -146,8 +172,8 @@ class LSGAN(object):
                 batch_noise = batch_noise.cuda()
                 
                 #===== train D =====#
-                self.G.eval()
-                self.D.train()
+                #self.D.train()
+                #self.G.eval()
                 
                 self.D_optimizer.zero_grad() #gradient initialization
                 D_real = self.D(batch_x)
@@ -163,13 +189,24 @@ class LSGAN(object):
                 D_total_loss = D_real_loss + D_fake_loss
                 self.train_hist["D_loss"].append(D_total_loss.item())
                 
+                '''
+                print("---------------------train D ------------------------")
+                if self.D.training:
+                    print("D is training")
+                else:
+                    print("D is eval")
+                if self.G.training:
+                    print("G is training")
+                else:
+                    print("G is eval")
                 
+                '''
                 self.D_optimizer.step()
                 
                 
                 #===== train G =====#
-                self.G.train()
-                self.D.eval()
+                #self.D.eval()
+                #self.G.train()
                 
                 self.G_optimizer.zero_grad()
                 G_output = self.G(batch_noise)
@@ -178,12 +215,25 @@ class LSGAN(object):
                 self.train_hist["G_loss"].append(G_loss.item())
                 
                 G_loss.backward()
+                
+                '''
+                print("---------------------train G ------------------------")
+                if self.D.training:
+                    print("D is training")
+                else:
+                    print("D is eval")
+                if self.G.training:
+                    print("G is training")
+                else:
+                    print("G is eval")
+                '''
+                
                 self.G_optimizer.step()
                 
                 #===== print some info =====#
                 if ((step + 1) % 100) == 0:
-                    print("Epoch: [%2d] [%4d/%4d] D_loss: %.8f, G_loss: %.8f" %
-                          ((epoch + 1),
+                    print("Epoch: [{}] [{}/{}] D_loss: {}, G_loss: {}".format(
+                           (epoch + 1),
                            (step + 1),
                            self.dataloader.dataset.__len__() // self.batch_size, 
                            D_total_loss.item(),
@@ -196,7 +246,7 @@ class LSGAN(object):
 
                 
                 
-            if epoch % 2 == 0:
+            if epoch % 10 == 0:
                 print("epoch : ", epoch)
                 print("saving model...")
                 with torch.no_grad():

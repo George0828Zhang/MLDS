@@ -285,11 +285,14 @@ class DCGAN():
         image = (1 + images.cpu().detach().numpy())/2 * 255
         #image = np.reshape(image, [self.height, self.width, self.channels])
         int_X = image.clip(0,255).astype('uint8')
+
         int_X = int_X.reshape(rows, -1, self.height, self.width, self.channels)
         #print(int_X.shape)
         int_X = int_X.swapaxes(1,2).reshape(rows*self.height,-1, self.channels)
         image = Image.fromarray(int_X)
 
+
+                
         
         print(np.where(tags==1))
         a = torch.nn.functional.sigmoid(self.D(images, tags_tensor))

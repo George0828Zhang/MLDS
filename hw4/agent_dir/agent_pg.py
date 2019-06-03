@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from torchvision import models
 from torchsummary import summary
+from tqdm import tqdm
 
 def prepro(o,image_size=(80,80)):
     """
@@ -37,29 +38,11 @@ class AgentNN(torch.nn.Module):
         self.output_class = output_class
         self.input_size = input_size
         
-#         self.convlayers = nn.Sequential(
-#             nn.Conv2d(in_channels=self.input_dim, out_channels=6, kernel_size=5, stride=1, padding=2, bias=True),
-#             nn.ReLU(),
-#             nn.MaxPool2d(kernel_size=2, stride=2),
-#             nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5, stride=1, padding=2, bias=True),
-#             nn.ReLU(),
-#             nn.MaxPool2d(kernel_size=2,stride=2),
-#             # [batch, 16,20,20]
-#         )
-#         self.fully = nn.Sequential(
-#             # [batch, 16,20,20]
-#             nn.Linear(16*20*20, 120),
-#             nn.ReLU(),
-#             nn.Linear(120, 84),
-#             nn.ReLU(),
-#             nn.Linear(84, self.output_class),
-#             nn.Softmax(-1)
-#         )
         self.fully = nn.Sequential(
             # [batch, 16,20,20]
-            nn.Linear(input_size[0]*input_size[1]*input_size[2], 64),
+            nn.Linear(input_size[0]*input_size[1]*input_size[2], 200),
             nn.ReLU(),
-            nn.Linear(64, self.output_class),
+            nn.Linear(200, self.output_class),
             nn.Softmax(-1)
         )
 
@@ -68,8 +51,6 @@ class AgentNN(torch.nn.Module):
     def forward(self, x):
         batch_size = x.shape[0]
         
-#         out = self.convlayers(x)
-#         out = self.fully(out.view(batch_size, -1))
         out = self.fully(x.view(batch_size, -1))
         return out
         
@@ -94,8 +75,9 @@ class Agent_PG(Agent):
         self.lastframe = 0
         self.gamma = 0.99
         self.device = torch.device('cuda')
-        self.agentnn = AgentNN((1,80,80), input_dim=1, output_class=4).to(self.device)
-        self.optimizer = torch.optim.Adam(self.agentnn.parameters(), lr=0.01)
+        self.agentnn = AgentNN((1,80,80), input_dim=1, output_class=3).to(self.device)
+        self.optimizer = torch.optim.RMSprop(self.agentnn.parameters(), lr=5e-3)
+        #self.optimizer = torch.optim.Adam(self.agentnn.parameters(), lr=0.1)
         
         summary(self.agentnn, (1,80,80))
 
@@ -121,8 +103,9 @@ class Agent_PG(Agent):
         # YOUR CODE HERE #
         ##################
         epochs = 1000
-        round_episodes = 1
-        self.env.seed(7373)
+        round_episodes = 10
+        save_rate = 20
+        self.env.seed(6873)
         self.agentnn.train()
         
         for e in range(epochs):
@@ -130,6 +113,7 @@ class Agent_PG(Agent):
             episode_losses = []
             avg_reward_prt = 0.0
                         
+#             for i in tqdm(range(round_episodes)):
             for i in range(round_episodes):
                 #playing one game
                 
@@ -155,21 +139,26 @@ class Agent_PG(Agent):
                 current_rewards_adjust = current_rewards_adjust[::-1]
                 avg_reward_prt += sum(current_rewards)
                 
-                mean = sum(current_rewards_adjust) / (len(current_rewards_adjust)+1e-8)
-                
-                losses = 0
-                for lp,r in zip(current_logprob, current_rewards_adjust):
-                    losses += lp*(r-mean)
-#                 losses = torch.sum(torch.mul(torch.stack(current_logprob,0), torch.FloatTensor(current_rewards_adjust).to(self.device)), -1)                
+#                 mean = sum(current_rewards_adjust) / (len(current_rewards_adjust)+1e-8)
+                rewardTensor =  torch.FloatTensor(current_rewards_adjust).to(self.device)
+                r_mean = rewardTensor.mean(-1)
+                r_std = rewardTensor.std(-1)
+                rewardTensor = (rewardTensor - r_mean)/r_std
+#                 losses = 0
+#                 for lp,r in zip(current_logprob, current_rewards_adjust):
+#                     losses += lp*(r-mean)
+                losses = torch.sum(torch.mul(torch.stack(current_logprob,0), rewardTensor), -1)                
                 episode_losses.append(losses)
                 
             self.optimizer.zero_grad()
-            final_loss = -torch.stack(episode_losses, 0).mean()    
+            final_loss = - torch.stack(episode_losses, 0).mean(-1)    
 #             print(final_loss.requires_grad)
             final_loss.backward()
             self.optimizer.step()
             
-            print("average reward: {} loss: {}".format(avg_reward_prt/round_episodes, final_loss.item()), end='\n')
+            print("epoch {}: average reward: {} loss: {}".format(e+1, avg_reward_prt/round_episodes, final_loss.item()), end='\n')
+            if e % save_rate == 0:
+                torch.save(self.agentnn, "checkpoint/Agent"+str(e))
 #             for i,param in enumerate(self.agentnn.parameters()):
 #                 if i == 2:
 #                     print(param.data)
@@ -222,14 +211,18 @@ class Agent_PG(Agent):
         distri = torch.distributions.Categorical(probs)
         index = distri.sample()
         
+        print(probs)
+        
         
         #print(self.env.env.unwrapped.get_action_meanings())
         #['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']
 #         index = index.item()
 #         print(index)
+
+        actions = [0, 2, 3]
         
         if test:
-            return index.item()
+            return actions[index.item()]
         else:
 #             return torch.log(probs[index]+1e-8), index.item()
-            return distri.log_prob(index), index.item()
+            return distri.log_prob(index), actions[index.item()]

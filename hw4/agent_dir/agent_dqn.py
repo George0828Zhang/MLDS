@@ -1,4 +1,32 @@
 from agent_dir.agent import Agent
+import cv2
+import numpy as np
+import torch
+import torch.nn as nn
+from torchvision import models
+from torchsummary import summary
+from tqdm import tqdm
+
+class DQN(nn.Module):
+    def __init__(self, input_size):
+        super(DQN,self).__init__()
+        self.input_size = input_size
+        
+        self.fully = nn.Sequential(
+            nn.Linear(input_size[0]*input_size[1]*input_size[2] + 1, 200),
+            nn.ReLU(),
+            nn.Linear(200, 200),
+            nn.ReLU(),
+            nn.Linear(200, 1)
+        )
+        
+    def forward(self, x, a):
+        batch_size = x.shape[0]
+
+        x = torch.cat((x.view(batch_size, -1), a), 1)
+        
+        out = self.fully(x)
+        return out
 
 class Agent_DQN(Agent):
     def __init__(self, env, args):
@@ -16,7 +44,13 @@ class Agent_DQN(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-
+        input_size = (84,84,4)
+        self.gamma = 0.99
+        self.eps_greedy = 0 # 0 to full random
+        self.device = torch.device('cuda')
+        self.dqnn = DQN(input_size).to(self.device)
+        self.dqnn_hat = DQN(input_size).to(self.device)
+        self.optimizer = torch.optim.RMSprop(self.dqnn.parameters(), lr=5e-3)
 
     def init_game_setting(self):
         """
@@ -56,5 +90,20 @@ class Agent_DQN(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        return self.env.get_random_action()
+        print(self.env.env.unwrapped.get_action_meanings())
+        actions = [0,2,3]
+        self.actions = torch.FloatTensor(actions).view(-1, 1).to(self.device)
+
+        # epsilon greedy
+        if np.random.rand() > self.eps_greedy:
+            """ random """
+            return self.env.get_random_action()
+        else:
+            """ greedy """
+            data_x = torch.FloatTensor(observation)
+            data_x = data_x.view(1, 84, 84, 4).repeat(len(self.actions), 1, 1, 1).to(self.device)
+
+            q_values = self.dqnn(data_x, self.actions)
+
+            return torch.argmax(q_values).item()
 

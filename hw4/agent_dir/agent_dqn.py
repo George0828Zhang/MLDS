@@ -46,11 +46,15 @@ class Agent_DQN(Agent):
         ##################
         input_size = (84,84,4)
         self.gamma = 0.99
-        self.eps_greedy = 0 # 0 to full random
+        self.eps_greedy = 1. # 1. to full random
         self.device = torch.device('cuda')
         self.dqnn = DQN(input_size).to(self.device)
         self.dqnn_hat = DQN(input_size).to(self.device)
         self.optimizer = torch.optim.RMSprop(self.dqnn.parameters(), lr=5e-3)
+        #['NOOP', 'FIRE', 'RIGHT', 'LEFT']
+        #print(self.env.env.unwrapped.get_action_meanings())
+        self.actions = torch.FloatTensor([0,1,2,3]).view(-1, 1).to(self.device)
+
 
     def init_game_setting(self):
         """
@@ -90,12 +94,10 @@ class Agent_DQN(Agent):
         ##################
         # YOUR CODE HERE #
         ##################
-        print(self.env.env.unwrapped.get_action_meanings())
-        actions = [0,2,3]
-        self.actions = torch.FloatTensor(actions).view(-1, 1).to(self.device)
-
+        #print(self.actions)
+        
         # epsilon greedy
-        if np.random.rand() > self.eps_greedy:
+        if np.random.rand() < self.eps_greedy:
             """ random """
             return self.env.get_random_action()
         else:

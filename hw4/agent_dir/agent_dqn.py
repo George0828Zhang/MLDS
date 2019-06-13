@@ -8,11 +8,8 @@ import torch
 import torch.nn as nn
 from collections import namedtuple
 from itertools import count
-from torchvision import models
 from torchsummary import summary
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-import time
+from collections import deque
 
 
 # ['NOOP', 'FIRE', 'RIGHT', 'LEFT']
@@ -127,6 +124,8 @@ class Agent_DQN(Agent):
         self.Q_target.load_state_dict(self.Q_policy.state_dict())
         self.Q_target.eval()
         self.memory = ReplayMemory(10000)
+        self.RewardQueue = deque(maxlen=30)
+        self.AverageReward_hist = []
         
         self.optimizer = torch.optim.Adam(self.Q_policy.parameters(), lr=1e-4)    
         self.MSE_loss = nn.MSELoss().to(self.device)
@@ -191,15 +190,16 @@ class Agent_DQN(Agent):
                     
                 REWARD = REWARD + reward                
                 if done:           
-                    self.Reward_hist.append(REWARD)
-                    print("episode : {}, step : {}, clip score:{}".format(i_episode, self.steps_done, REWARD))
+                    self.RewardQueue.append(REWARD)
+                    average_reward = sum(self.RewardQueue) / len(self.RewardQueue)
+                    self.AverageReward_hist.append(average_reward)
+                    print("episode : {}, step : {}, average_reward:{}".format(i_episode, self.steps_done, average_reward))
                     break                        
             
 
             
             if i_episode % 1000 == 0:
-                dump_data = [self.steps_done, i_episode, self.Reward_hist]
-                self.Reward_hist = []
+                dump_data = [self.steps_done, i_episode, self.AverageReward_hist]
                 print("episode : ", i_episode)
                 print("saving model...")
                 save(i_episode, dump_data)

@@ -174,8 +174,15 @@ class Agent_DQN(Agent):
             # Compute Q(s_{t+1}, a) for all next states.
             # Since we do not want to backprop through the expected action values,
             # use torch.no_grad() to stop the gradient from Q(s_{t+1}, a)
+            
+            # basic deep q
+            #next_state_values = torch.zeros(self.batch_size, device=self.device)
+            #next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
+            
+            # double deep q
             next_state_values = torch.zeros(self.batch_size, device=self.device)
-            next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
+            online_net_actions = self.online_net(non_final_next_states).max(1)[1]
+            next_state_values[non_final_mask] = self.target_net(non_final_next_states).gather(1, index=online_net_actions)
             
 
         # TODO:

@@ -6,6 +6,7 @@ import numpy as np
 import pickle
 import torch
 import torch.nn as nn
+import sys
 from collections import namedtuple
 from itertools import count
 from torchsummary import summary
@@ -110,13 +111,13 @@ class Agent_DQN(Agent):
         self.DQN_INPUT_SIZE = (4, 84, 84)
         self.BATCH_SIZE = 32
         self.GAMMA = 0.99
-        self.EPS_START = 0.9
-        self.EPS_DECAY = 100000
-        self.EPS_END = 0.025
+        self.EPS_START = 1
+        self.EPS_DECAY = 1000000
+        self.EPS_END = 0.02
         
+        self.episodes_done = 0
         self.steps_done = 0
-        self.Loss_hist = []
-        self.Reward_hist = []
+        
         
         self.device = torch.device('cuda')        
         self.Q_policy = DQN(self.DQN_INPUT_SIZE).to(self.device)     
@@ -124,15 +125,17 @@ class Agent_DQN(Agent):
         self.Q_target.load_state_dict(self.Q_policy.state_dict())
         self.Q_target.eval()
         self.memory = ReplayMemory(10000)
+        
         self.RewardQueue = deque(maxlen=30)
         self.AverageReward_hist = []
         
-        self.optimizer = torch.optim.Adam(self.Q_policy.parameters(), lr=1e-4)    
+        self.optimizer = torch.optim.Adam(self.Q_policy.parameters(), lr=1.5e-4)    
         self.MSE_loss = nn.MSELoss().to(self.device)
         """------------------------------------------------------------------"""
         
         if args.test_dqn:
             #you can load your model here
+            self.load("Q_saved_base", 50000)
             print('loading trained model')   
             
             
@@ -140,17 +143,19 @@ class Agent_DQN(Agent):
         print('---------- Networks architecture -------------')
         summary(self.Q_policy, (self.DQN_INPUT_SIZE))
         print('----------------------------------------------')
+        
+    def load(self, save_dir, i_episode):
+        model_path = os.path.join(save_dir, str(i_episode) + "_Q.pkl")
+        self.Q_policy.load_state_dict(torch.load(model_path))
+        self.Q_target.load_state_dict(self.Q_policy.state_dict())
+        
+        with open (os.path.join(save_dir, str(i_episode) + ".pkl"), 'rb') as f:
+            Data = pickle.load(f)
+            self.steps_done = int(Data[0])
+            self.episodes_done = int(Data[1])
 
     def init_game_setting(self):
-        """
-
-        Testing function will call this function at the begining of new game
-        Put anything you want to initialize if necessary
-
-        """
-        ##################
-        # YOUR CODE HERE #
-        ##################self.noise_dim,
+        self.Q_policy.eval()
         pass
     
     def train(self):
@@ -159,8 +164,7 @@ class Agent_DQN(Agent):
         # -> transpose((2, 0, 1))
         # -> shape : (4, 84, 84)
         
-        def save(i_episode, dump_data):
-            save_dir = "Q_saved_base"
+        def save(save_dir, i_episode, dump_data):
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
             torch.save(self.Q_policy.state_dict(), os.path.join(save_dir, str(i_episode) + "_Q.pkl"))
@@ -170,39 +174,43 @@ class Agent_DQN(Agent):
         #######################################################################
         #                       MAIN TRAINING LOOP                            # 
         #######################################################################
-        for i_episode in count():
+        
+        #self.load("Q_saved_double_v3", 13000)                   
+        for e in count():
             state = self.env.reset()
             REWARD = 0
-            for t in count():
+            
+            for s in count():
                 # in make_action self.step_done += 1
                 # IMPORTANT! : make_action receive size (84,84,4)
-                action = self.make_action(state)
-                next_state, reward, done, _ = self.env.step(action)   
-                self.memory.push(state, [action], next_state, [int(reward)])
+                action = self.make_action(state, False)
+                next_state, reward, done, _ = self.env.step(action)
+                self.memory.push(state, [action], next_state, [reward])
                 state = next_state       
                 
                 if self.steps_done % 4 ==0:
                     self.optimize_model()
-                    
+                
                 if self.steps_done % 1000 == 0:
                     print("Q_target <- Q_policy")
-                    self.Q_target.load_state_dict(self.Q_policy.state_dict())                    
+                    self.Q_target.load_state_dict(self.Q_policy.state_dict())         
+                
                     
-                REWARD = REWARD + reward                
-                if done:           
-                    self.RewardQueue.append(REWARD)
+                REWARD = REWARD + reward
+                if done:
+                    self.RewardQueue.append(REWARD)                    
                     average_reward = sum(self.RewardQueue) / len(self.RewardQueue)
                     self.AverageReward_hist.append(average_reward)
-                    print("episode : {}, step : {}, average_reward:{}".format(i_episode, self.steps_done, average_reward))
-                    break                        
-            
-
-            
-            if i_episode % 1000 == 0:
-                dump_data = [self.steps_done, i_episode, self.AverageReward_hist]
-                print("episode : ", i_episode)
-                print("saving model...")
-                save(i_episode, dump_data)
+                    print("episode : {}, step : {}, average_reward:{}".format(self.episodes_done, self.steps_done, average_reward))                    
+                    break        
+                
+            if self.episodes_done % 1000 == 0:
+                dump_data = [self.steps_done, self.episodes_done, self.AverageReward_hist]
+                print("episode : ", self.episodes_done, "saving model...")
+                save("Q_saved_base_v2", self.episodes_done, dump_data)
+                
+                
+            self.episodes_done += 1
             
             
                 
@@ -222,27 +230,33 @@ class Agent_DQN(Agent):
                             math.exp(-1. * self.steps_done / self.EPS_DECAY)
         self.steps_done += 1
         
-        # epsilon greedy
-        if np.random.rand() < eps_threshold:
-            """ random """
-            return self.env.get_random_action()
-        
-        
-        else:
-            """ greedy """
-            # input is (84, 84, 4)
-            # permute -> (4, 84, 84)
-            # unsqueeze -> (1, 4, 84, 84)
-            
+        if test:
             with torch.no_grad():
                 observation = torch.FloatTensor(observation).permute((2,0,1)).unsqueeze(0).to(self.device)
                 actionsQ = self.Q_policy(observation)
                 return torch.argmax(actionsQ).item()
+        
+        # epsilon greedy
+        else : 
+            if np.random.rand() < eps_threshold:
+                """ random """
+                return self.env.get_random_action()
             
+            
+            else:
+                """ greedy """
+                # input is (84, 84, 4)
+                # permute -> (4, 84, 84)
+                # unsqueeze -> (1, 4, 84, 84)
+                
+                with torch.no_grad():
+                    observation = torch.FloatTensor(observation).permute((2,0,1)).unsqueeze(0).to(self.device)
+                    actionsQ = self.Q_policy(observation)
+                    return torch.argmax(actionsQ).item()
+                
             
     def optimize_model(self):
-        # there should be enough data in memory
-        
+        # there should be enough data in memory        
         if len(self.memory) < self.BATCH_SIZE:
             return 
         
@@ -257,38 +271,36 @@ class Agent_DQN(Agent):
         
         # 1. batch.next_state
         next_state_batch = torch.cat(to_tuple_of_tensor(batch.next_state)).float().to(self.device)
-        next_state_batch = next_state_batch.permute((0, 3, 1, 2)) # to BCHW
-        
+        next_state_batch = next_state_batch.permute((0, 3, 1, 2)) # to BCHW (32, 4, 84, 84)
+
         # 2. batch.state
         state_batch = torch.cat(to_tuple_of_tensor(batch.state)).float().to(self.device)
-        state_batch = state_batch.permute((0, 3, 1, 2)) # to BCHW
-        
+        state_batch = state_batch.permute((0, 3, 1, 2)) # to BCHW (32, 4, 84, 84)
+
         # to long is for gather
-        # 3. batch.action
+        # 3. batch.action (32, 1)
         action_batch = torch.cat(to_tuple_of_tensor(batch.action)).to(self.device).long()
-        
-        # 4. batch.reward
+
+        # 4. batch.reward (32, 1)
         reward_batch = torch.cat(to_tuple_of_tensor(batch.reward)).to(self.device)
-        
-        
-        #debug
-        """
-        if self.steps_done == 200:
-            print("saved")
-            with open('actions.pkl', 'wb') as f:
-                    pickle.dump(action_batch, f)
-            with open('transistions.pkl', 'wb') as f:
-                    pickle.dump(batch, f)        
-        """
-        
+                
         Qvalue_t0 = self.Q_policy(state_batch).gather(1, index=action_batch)
         Qvalue_t1 = self.Q_target(next_state_batch).max(1)[0].unsqueeze(1).detach()
         expected_Qvalue = (Qvalue_t1*self.GAMMA) + reward_batch
         
-        loss = self.MSE_loss(Qvalue_t0, expected_Qvalue)
+        
+        """
+        Qvalue_t1_a = self.Q_policy(next_state_batch).max(1)[1].unsqueeze(1).long()        
+        double_Qvalue_t1 = self.Q_target(next_state_batch).gather(1, index=Qvalue_t1_a)
+        expected_Qvalue = (double_Qvalue_t1*self.GAMMA) + reward_batch
+        """
         self.optimizer.zero_grad()
+        loss = self.MSE_loss(Qvalue_t0, expected_Qvalue)
+        loss = loss.clamp(-1, 1)
         loss.backward()
-        for param in self.Q_policy.parameters():
-            param.grad.data.clamp_(-1, 1)        
         self.optimizer.step()
+        """
+        for param in self.Q_policy.parameters():
+            param.grad.data.clamp_(-1, 1)         
+        """
     

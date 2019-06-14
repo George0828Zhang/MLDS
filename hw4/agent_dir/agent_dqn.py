@@ -1,45 +1,18 @@
-from agent_dir.agent import Agent
-import os
-import math
 import random
+import math
 import numpy as np
-import pickle
 import torch
+import torch.nn.functional as F
+import torch.optim as optim
 import torch.nn as nn
-import sys
-from collections import namedtuple
-from itertools import count
-from torchsummary import summary
-from collections import deque
+import random
 
+from agent_dir.agent import Agent
+from environment import Environment
 
-# ['NOOP', 'FIRE', 'RIGHT', 'LEFT']
-ACTION_SIZE = 3
+use_cuda = torch.cuda.is_available()
 
-Transition = namedtuple('Transition',
-                ('state', 'action', 'next_state', 'reward')) 
-
-#In memory state size : (84, 84, 4)
-class ReplayMemory:
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = []
-        self.position = 0
-    def push(self, *args):
-        """ Saves a transition """
-        if len(self.memory) < self.capacity:
-            self.memory.append(None)
-        self.memory[self.position] = Transition(*args)
-        self.position = (self.position + 1) % self.capacity
-    
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
-        
-    def __len__(self):
-        return len(self.memory)
-    
-    
-        
+ACTION_SIZE = 4
 
 class DQN(nn.Module):    
     #dqn : input_size is (batch_size, 4, 84, 84) in CHW format
@@ -71,241 +44,221 @@ class DQN(nn.Module):
         observation = observation.view(-1, self.linear_input_size)        
         observation= self.fc1(observation)
         observation = self.relu(observation)
-        actionsQ = self.fc2(observation)
-        
+        actionsQ = self.fc2(observation)       
         return actionsQ 
         
 
-"""
-    in main:
-        env = Environment(env_name, args, atari_wrapper=True)
-        agent = Agent_DQN(env, args)
-    
-    
-    for deep q learning:
-        observation size is (84, 84, 4) : 4 gray-scale frames stacked
-    
-    for the atari game breakout:
-        use self.env.env.unwrapped.get_action_meanings() to get the action space
-        action space : ['NOOP', 'FIRE', 'RIGHT', 'LEFT']
-        action size : 4
-"""
-
-
 class Agent_DQN(Agent):
     def __init__(self, env, args):
-        """
-            class Agent(object):
-                def __init__(self, env):
-                    self.env = env
-                    
-            self.env means Environment, containing 6 functions:
-                1. seed(seed)
-                2. reset()
-                3. step(action)
-                4. get_action_space()
-                5. get_observation_space()
-                6. get_random_action()        
-                
-        """
-        
-        super(Agent_DQN,self).__init__(env)
+        self.env = env
+        self.input_channels = 1
+        self.num_actions = 3#self.env.action_space.n
+        # TODO:
+        # Initialize your replay buffer
+        #states_buffer, actions_buffer, reward_buffers = [], [], []
+        self.capacity = 2000;
+        self.buffer = []
         self.DQN_INPUT_SIZE = (4, 84, 84)
-        self.BATCH_SIZE = 32
-        self.GAMMA = 0.99
+        # build target, online network
+        self.target_net = DQN(self.DQN_INPUT_SIZE)
+        self.target_net = self.target_net.cuda() if use_cuda else self.target_net
+        self.online_net = DQN(self.DQN_INPUT_SIZE) 
+        self.online_net = self.online_net.cuda() if use_cuda else self.online_net
+
         self.EPS_START = 1
-        self.EPS_DECAY = 1000000
+        self.EPS_DECAY = 1000
         self.EPS_END = 0.02
         
-        self.episodes_done = 0
         self.steps_done = 0
         
-        
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  
-        self.Q_policy = DQN(self.DQN_INPUT_SIZE).to(self.device)     
-        self.Q_target = DQN(self.DQN_INPUT_SIZE).to(self.device)
-        self.Q_target.load_state_dict(self.Q_policy.state_dict())
-        #self.Q_target.eval()
-        self.memory = ReplayMemory(10000)
-        
-        self.RewardQueue = deque(maxlen=30)
-        self.AverageReward_hist = []
-        
-        self.optimizer = torch.optim.Adam(self.Q_policy.parameters(), lr=1e-4)    
-        #self.MSE_loss = nn.MSELoss().to(self.device)
-        self.l1_loss = torch.nn.SmoothL1Loss(size_average=None, reduce=None, reduction='mean')
-        """------------------------------------------------------------------"""
-        
         if args.test_dqn:
-            #you can load your model here
-            self.load("Q_saved_base", 50000)
-            print('loading trained model')   
-            
-            
-        print("Using Device : {}".format(self.device))
-        print('---------- Networks architecture -------------')
-        summary(self.Q_policy, (self.DQN_INPUT_SIZE))
-        print('----------------------------------------------')
+            self.load('dqn')
         
-    def load(self, save_dir, i_episode):
-        model_path = os.path.join(save_dir, str(i_episode) + "_Q.pkl")
-        self.Q_policy.load_state_dict(torch.load(model_path))
-        self.Q_target.load_state_dict(self.Q_policy.state_dict())
+        # discounted reward
+        self.GAMMA = 0.99 
+        #self.GAMMA = 0.75
+        #self.GAMMA = 0.5
+        #self.GAMMA = 0.25
         
-        with open (os.path.join(save_dir, str(i_episode) + ".pkl"), 'rb') as f:
-            Data = pickle.load(f)
-            self.steps_done = int(Data[0])
-            self.episodes_done = int(Data[1])
+        # training hyperparameters
+        self.train_freq = 4 # frequency to train the online network
+        self.learning_start = 10000 # before we start to update our network, we wait a few steps first to fill the replay.
+        self.batch_size = 32
+        self.num_timesteps = 3000000 # total training steps
+        self.display_freq = 30 # frequency to display training progress
+        self.save_freq = 200000 # frequency to save the model
+        self.target_update_freq = 1000 # frequency to update target network
+
+        # optimizer
+        self.optimizer = optim.RMSprop(self.online_net.parameters(), lr=1e-4)
+
+        self.steps = 0 # num. of passed steps. this may be useful in controlling exploration
+        
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        
+        self.total_steps = []
+        self.avg_rewards = []
+
+
+    def save(self, save_path):
+        print('save model to', save_path)
+        torch.save(self.online_net.state_dict(), save_path + '_online.cpt')
+        torch.save(self.target_net.state_dict(), save_path + '_target.cpt')
+        torch.save({'steps':self.total_steps, 'avg_rewards':self.avg_rewards}, 'DQNGraphRequired')
+
+    def load(self, load_path):
+        print('load model from', load_path)
+        if use_cuda:
+            self.online_net.load_state_dict(torch.load(load_path + '_online.cpt'))
+            self.target_net.load_state_dict(torch.load(load_path + '_target.cpt'))
+        else:
+            self.online_net.load_state_dict(torch.load(load_path + '_online.cpt', map_location=lambda storage, loc: storage))
+            self.target_net.load_state_dict(torch.load(load_path + '_target.cpt', map_location=lambda storage, loc: storage))
 
     def init_game_setting(self):
-        self.Q_policy.eval()
-        print("Q policy evaluate")
+        # we don't need init_game_setting in DQN
         pass
     
-    def train(self):
-        
-        # observation shape : (84, 84, 4)
-        # -> transpose((2, 0, 1))
-        # -> shape : (4, 84, 84)
-        
-        def save(save_dir, i_episode, dump_data):
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            torch.save(self.Q_policy.state_dict(), os.path.join(save_dir, str(i_episode) + "_Q.pkl"))
-            with open(os.path.join(save_dir, '{}.pkl'.format(i_episode)), 'wb') as f:
-                pickle.dump(dump_data, f)
-        
-        #######################################################################
-        #                       MAIN TRAINING LOOP                            # 
-        #######################################################################
-        
-        #self.load("Q_saved_double_v3", 13000)                   
-        for e in count():
-            state = self.env.reset()
-            REWARD = 0
-            
-            for s in count():
-                # in make_action self.step_done += 1
-                # IMPORTANT! : make_action receive size (84,84,4)
-                action = self.make_action(state, False)
-                next_state, reward, done, _ = self.env.step(action)
-                self.memory.push(state, [action], next_state, [reward])
-                state = next_state       
-                
-                if self.steps_done % 4 ==0:
-                    self.optimize_model()
-                
-                if self.steps_done % 1000 == 0:
-                    print("Q_target <- Q_policy")
-                    self.Q_target.load_state_dict(self.Q_policy.state_dict())         
-                
-                    
-                REWARD = REWARD + reward
-                if done:
-                    self.RewardQueue.append(REWARD)                    
-                    average_reward = sum(self.RewardQueue) / len(self.RewardQueue)
-                    self.AverageReward_hist.append(average_reward)
-                    print("episode : {}, step : {}, average_reward:{}".format(self.episodes_done, self.steps_done, average_reward))                    
-                    break        
-                
-            if self.episodes_done % 1000 == 0:
-                dump_data = [self.steps_done, self.episodes_done, self.AverageReward_hist]
-                print("episode : ", self.episodes_done, "saving model...")
-                save("Q_saved_base_v2", self.episodes_done, dump_data)
-                
-                
-            self.episodes_done += 1
-            
-            
-                
-    def make_action(self, observation, test=True):
-        """
-            Return predicted action of your agent
-    
-            Input:
-                observation: np.array
-                    stack 4 last preprocessed frames, shape: (84, 84, 4)
-    
-            Return:
-                action: int
-                    the predicted action from trained model
-        """
+    def make_action(self, state, test=False):
+        # TODO:
+        # At first, you decide whether you want to explore the environemnt
+
+        # TODO:
+        # if explore, you randomly samples one action
+        # else, use your model to predict action
         eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) *\
                             math.exp(-1. * self.steps_done / self.EPS_DECAY)
         self.steps_done += 1
         
-        if test:
-            with torch.no_grad():
-                observation = torch.FloatTensor(observation).permute((2,0,1)).unsqueeze(0).to(self.device)
-                actionsQ = self.Q_policy(observation)
-                return torch.argmax(actionsQ).item()
-        
-        # epsilon greedy
-        else : 
-            if np.random.rand() < eps_threshold:
-                """ random """
-                return random.randint(1,3)#self.env.get_random_action()
-            
-            
+        with torch.no_grad():
+            #state = state).float().unsqueeze(0)
+            if(test==True):
+                probs = self.online_net(torch.tensor(state, device=self.device).unsqueeze(0).transpose(3,2).transpose(2,1)).squeeze(0)
             else:
-                """ greedy """
-                # input is (84, 84, 4)
-                # permute -> (4, 84, 84)
-                # unsqueeze -> (1, 4, 84, 84)
-                
-                with torch.no_grad():
-                    observation = torch.FloatTensor(observation).permute((2,0,1)).unsqueeze(0).to(self.device)
-                    actionsQ = self.Q_policy(observation)
-                    return torch.argmax(actionsQ).item() + 1
-                
+                probs = self.online_net(torch.tensor(state, device=self.device)).squeeze(0)
+
+            if(random.random() < 1 - eps_threshold):
+                value, index = torch.max(probs, 0)
+                action = index.item()
+            else:
+                action = random.randint(0, self.num_actions - 1)
+
+        return action
+
+    def update(self):
+        # TODO:
+        # To update model, we sample some stored experiences as training examples.
+        batch = random.sample(self.buffer, self.batch_size)
+        # TODO:
+        # Compute Q(s_t, a) with your model.
+        state_batch = np.array(batch)[:,0].tolist();
+        state_batch = torch.cat(state_batch, 0);
+        
+        action_batch = torch.tensor(np.array(batch)[:,1].tolist(), device = self.device);
+        
+        reward_batch = torch.tensor(np.array(batch)[:,2].tolist(), device = self.device);
+        
+        next_state_batch = np.array(batch)[:,3].tolist();
+                                    
+        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
+                                          next_state_batch)), device=self.device, dtype=torch.uint8)
+        non_final_next_states = torch.cat([s for s in next_state_batch
+                                                if s is not None])
+        
+        temp = torch.tensor([[i] for i in action_batch], device = self.device);
+        state_action_values = self.online_net(state_batch).gather(1, temp);  
+        
+        
+        with torch.no_grad():
+            # TODO:
+            # Compute Q(s_{t+1}, a) for all next states.
+            # Since we do not want to backprop through the expected action values,
+            # use torch.no_grad() to stop the gradient from Q(s_{t+1}, a)
+            next_state_values = torch.zeros(self.batch_size, device=self.device)
+            next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
             
-    def optimize_model(self):
-        # there should be enough data in memory        
-        if len(self.memory) < self.BATCH_SIZE:
-            return 
-        
-        transitions = self.memory.sample(self.BATCH_SIZE)
-        batch = Transition(*zip(*transitions))
-        # zip(*[('a', 1), ('b', 2), ('c', 3), ('d', 4)])
-        # ->[('a', 'b', 'c', 'd'), (1, 2, 3, 4)]
-        # converts batch-array of Transitions to Transition of batch-arrays 
 
-        def to_tuple_of_tensor(t):            
-            return(tuple(torch.Tensor(e).unsqueeze(0) for e in list(t)))
-        
-        # 1. batch.next_state
-        next_state_batch = torch.cat(to_tuple_of_tensor(batch.next_state)).float().to(self.device)
-        next_state_batch = next_state_batch.permute((0, 3, 1, 2)) # to BCHW (32, 4, 84, 84)
+        # TODO:
+        # Compute the expected Q values: rewards + gamma * max(Q(s_{t+1}, a))
+        # You should carefully deal with gamma * max(Q(s_{t+1}, a)) when it is the terminal state.
 
-        # 2. batch.state
-        state_batch = torch.cat(to_tuple_of_tensor(batch.state)).float().to(self.device)
-        state_batch = state_batch.permute((0, 3, 1, 2)) # to BCHW (32, 4, 84, 84)
-
-        # to long is for gather
-        # 3. batch.action (32, 1)
-        action_batch = torch.cat(to_tuple_of_tensor(batch.action)).to(self.device).long()
-
-        # 4. batch.reward (32, 1)
-        reward_batch = torch.cat(to_tuple_of_tensor(batch.reward)).to(self.device)
-                
-        Qvalue_t0 = self.Q_policy(state_batch).gather(1, index=action_batch)
-        Qvalue_t1 = self.Q_target(next_state_batch).max(1)[0].unsqueeze(1).detach()
-        expected_Qvalue = (Qvalue_t1*self.GAMMA) + reward_batch
+        expected_state_action_values = (next_state_values * self.GAMMA) + reward_batch
         
-        
-        """
-        Qvalue_t1_a = self.Q_policy(next_state_batch).max(1)[1].unsqueeze(1).long()        
-        double_Qvalue_t1 = self.Q_target(next_state_batch).gather(1, index=Qvalue_t1_a)
-        expected_Qvalue = (double_Qvalue_t1*self.GAMMA) + reward_batch
-        """
+        # TODO:
+        # Compute temporal difference loss
+        loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
         self.optimizer.zero_grad()
-        #loss = self.MSE_loss(Qvalue_t0, expected_Qvalue)
-        loss = self.l1_loss(Qvalue_t0, expected_Qvalue)
-        loss = loss.clamp(-1, 1)
         loss.backward()
         self.optimizer.step()
-        """
-        for param in self.Q_policy.parameters():
-            param.grad.data.clamp_(-1, 1)         
-        """
-    
+
+        return loss.item()
+
+    def train(self):
+        episodes_done_num = 0 # passed episodes
+        total_reward = 0 # compute average reward
+        loss = 0 
+        while(True):
+            state = self.env.reset()
+            # State: (80,80,4) --> (1,4,80,80)
+            state = torch.from_numpy(state).permute(2,0,1).unsqueeze(0)
+            state = state.cuda() if use_cuda else state
+            
+            done = False
+            
+            
+            while(not done):
+                # select and perform action
+                action = self.make_action(state)
+                next_state, reward, done, _ = self.env.step(action)
+                total_reward += reward
+
+
+                # process new state
+                next_state = torch.from_numpy(next_state).permute(2,0,1).unsqueeze(0)
+                next_state = next_state.cuda() if use_cuda else next_state
+                if done:
+                    next_state = None
+
+                # TODO:
+                # store the transition in memory
+                self.buffer.append([state, action, reward, next_state])
+                
+                
+                if(len(self.buffer) > self.capacity):
+                    self.buffer = self.buffer[-self.capacity:]
+                
+                # move to the next state
+                state = next_state
+
+                # Perform one step of the optimization
+                if self.steps > self.learning_start and self.steps % self.train_freq == 0:
+                    loss = self.update()
+
+                # update target network
+                if self.steps > self.learning_start and self.steps % self.target_update_freq == 0:
+                    self.target_net.load_state_dict(self.online_net.state_dict())
+
+                # save the model
+                if self.steps % self.save_freq == 0:
+                    self.save('dqn')
+
+                self.steps += 1
+            
+            
+            
+            #print(total_reward)
+            
+            if episodes_done_num % self.display_freq == 0:
+                print('Episode: %d | Steps: %d/%d | Avg reward: %f | loss: %f '%
+                        (episodes_done_num, self.steps, self.num_timesteps, total_reward / self.display_freq, loss))
+                self.avg_rewards.append(total_reward)
+                total_reward = 0
+
+            episodes_done_num += 1
+            
+            self.total_steps.append(self.steps)
+            
+            
+            if self.steps > self.num_timesteps:
+                break
+        self.save('dqn')

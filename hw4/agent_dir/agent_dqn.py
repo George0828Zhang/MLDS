@@ -14,7 +14,7 @@ from collections import deque
 
 
 # ['NOOP', 'FIRE', 'RIGHT', 'LEFT']
-ACTION_SIZE = 4
+ACTION_SIZE = 3
 
 Transition = namedtuple('Transition',
                 ('state', 'action', 'next_state', 'reward')) 
@@ -63,12 +63,14 @@ class DQN(nn.Module):
         
         self.linear_input_size = convW * convH * 64       
         self.fc1 = nn.Linear(self.linear_input_size, 512)
+        self.relu = nn.ReLU();
         self.fc2 = nn.Linear(512, ACTION_SIZE)
         
     def forward(self, observation):        
         observation = self.CONVS(observation)                
         observation = observation.view(-1, self.linear_input_size)        
         observation= self.fc1(observation)
+        observation = self.relu(observation)
         actionsQ = self.fc2(observation)
         
         return actionsQ 
@@ -119,18 +121,19 @@ class Agent_DQN(Agent):
         self.steps_done = 0
         
         
-        self.device = torch.device('cuda')        
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  
         self.Q_policy = DQN(self.DQN_INPUT_SIZE).to(self.device)     
         self.Q_target = DQN(self.DQN_INPUT_SIZE).to(self.device)
         self.Q_target.load_state_dict(self.Q_policy.state_dict())
-        self.Q_target.eval()
+        #self.Q_target.eval()
         self.memory = ReplayMemory(10000)
         
         self.RewardQueue = deque(maxlen=30)
         self.AverageReward_hist = []
         
-        self.optimizer = torch.optim.Adam(self.Q_policy.parameters(), lr=1.5e-4)    
-        self.MSE_loss = nn.MSELoss().to(self.device)
+        self.optimizer = torch.optim.Adam(self.Q_policy.parameters(), lr=1e-4)    
+        #self.MSE_loss = nn.MSELoss().to(self.device)
+        self.l1_loss = torch.nn.SmoothL1Loss(size_average=None, reduce=None, reduction='mean')
         """------------------------------------------------------------------"""
         
         if args.test_dqn:
@@ -156,6 +159,7 @@ class Agent_DQN(Agent):
 
     def init_game_setting(self):
         self.Q_policy.eval()
+        print("Q policy evaluate")
         pass
     
     def train(self):
@@ -240,7 +244,7 @@ class Agent_DQN(Agent):
         else : 
             if np.random.rand() < eps_threshold:
                 """ random """
-                return self.env.get_random_action()
+                return random.randint(1,3)#self.env.get_random_action()
             
             
             else:
@@ -252,7 +256,7 @@ class Agent_DQN(Agent):
                 with torch.no_grad():
                     observation = torch.FloatTensor(observation).permute((2,0,1)).unsqueeze(0).to(self.device)
                     actionsQ = self.Q_policy(observation)
-                    return torch.argmax(actionsQ).item()
+                    return torch.argmax(actionsQ).item() + 1
                 
             
     def optimize_model(self):
@@ -295,7 +299,8 @@ class Agent_DQN(Agent):
         expected_Qvalue = (double_Qvalue_t1*self.GAMMA) + reward_batch
         """
         self.optimizer.zero_grad()
-        loss = self.MSE_loss(Qvalue_t0, expected_Qvalue)
+        #loss = self.MSE_loss(Qvalue_t0, expected_Qvalue)
+        loss = self.l1_loss(Qvalue_t0, expected_Qvalue)
         loss = loss.clamp(-1, 1)
         loss.backward()
         self.optimizer.step()

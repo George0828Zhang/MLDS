@@ -84,7 +84,7 @@ class Agent_DQN(Agent):
         self.train_freq = 4 # frequency to train the online network
         self.learning_start = 10000 # before we start to update our network, we wait a few steps first to fill the replay.
         self.batch_size = 32
-        self.num_timesteps = 3000000 # total training steps
+        self.num_timesteps = 30000000 # total training steps
         self.display_freq = 30 # frequency to display training progress
         self.save_freq = 200000 # frequency to save the model
         self.target_update_freq = 1000 # frequency to update target network
@@ -180,9 +180,21 @@ class Agent_DQN(Agent):
             #next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
             
             # double deep q
-            next_state_values = torch.zeros(self.batch_size, device=self.device)
+            next_state_values = torch.zeros(self.batch_size, device=self.device)                     
+            
+            online_net_actions = torch.zeros(self.batch_size, device=self.device).long()
+            
+            #print(self.online_net(non_final_next_states).max(1)[1])
+            #print(self.online_net(non_final_next_states).max(1)[1].shape)
+            #print(next_state_values[non_final_mask])
+            #print(next_state_values[non_final_mask].shape)
+            #print(online_net_actions[non_final_mask])
+            #print(online_net_actions[non_final_mask].shape)
+            #print(non_final_next_states)
+            
+            
             online_net_actions = self.online_net(non_final_next_states).max(1)[1]
-            next_state_values[non_final_mask] = self.target_net(non_final_next_states).gather(1, index=online_net_actions)
+            next_state_values[non_final_mask] = self.target_net(non_final_next_states).gather(1, index=online_net_actions.unsqueeze(1)).squeeze(1)
             
 
         # TODO:

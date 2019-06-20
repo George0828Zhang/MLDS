@@ -14,8 +14,11 @@ def parse():
     parser.add_argument('--env_name', default=None, help='environment name')
     parser.add_argument('--train_pg', action='store_true', help='whether train policy gradient')
     parser.add_argument('--train_dqn', action='store_true', help='whether train DQN')
+    parser.add_argument('--train_a2c', action='store_true', help='whether train A2C')
+    
     parser.add_argument('--test_pg', action='store_true', help='whether test policy gradient')
     parser.add_argument('--test_dqn', action='store_true', help='whether test DQN')
+    parser.add_argument('--test_a2c', action='store_true', help='whether test A2C')
     try:
         from argument import add_arguments
         parser = add_arguments(parser)
@@ -30,7 +33,9 @@ def run(args):
         env_name = args.env_name or 'Pong-v0'
         env = Environment(env_name, args)
         from agent_dir.agent_pg import Agent_PG
+        print("pg")
         agent = Agent_PG(env, args)
+        print("pg2")
         agent.train()
 
     if args.train_dqn:
@@ -38,6 +43,13 @@ def run(args):
         env = Environment(env_name, args, atari_wrapper=True)
         from agent_dir.agent_dqn import Agent_DQN
         agent = Agent_DQN(env, args)
+        agent.train()
+        
+    if args.train_a2c:
+        env_name = args.env_name or 'BreakoutNoFrameskip-v4'
+        env = Environment(env_name, args, atari_wrapper=True)
+        from agent_dir.agent_a2c import Agent_A2C
+        agent = Agent_A2C(env, args)
         agent.train()
 
     if args.test_pg:
@@ -51,7 +63,12 @@ def run(args):
         from agent_dir.agent_dqn import Agent_DQN
         agent = Agent_DQN(env, args)
         test(agent, env, total_episodes=100)
-
+        
+    if args.test_a2c:
+        env = Environment('BreakoutNoFrameskip-v4', args, atari_wrapper=True, test=True)
+        from agent_dir.agent_a2c import Agent_A2C
+        agent = Agent_A2C(env, args)
+        test(agent, env, total_episodes=100)
 
 if __name__ == '__main__':
     args = parse()
